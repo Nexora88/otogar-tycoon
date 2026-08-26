@@ -12,6 +12,8 @@ export interface GameBus {
   engineHealth: number;
   color: BusColor;
   name: string;
+  fuelUse: number;
+  muavinCost: number;
 }
 
 export interface Passenger {
@@ -57,11 +59,94 @@ export interface CustomerCase {
 export type TerminalSlot =
   | "empty"
   | "toilet"
-  | "bakkal"
+  | "bufe"
+  | "emanet"
   | "cayci"
   | "bilet"
   | "mescit"
   | "otopark";
+
+export const SLOT_INFO: Record<
+  Exclude<TerminalSlot, "empty">,
+  { label: string; cost: number; cps: number; repMod: number; risk: number; desc: string }
+> = {
+  toilet: {
+    label: "Otogar Tuvaleti",
+    cost: 12000,
+    cps: 0.85,
+    repMod: 0,
+    risk: 0,
+    desc: "Bozuk paran yoksa turnikeden geçemezsin. Küçük ama bitmeyen nakit.",
+  },
+  bufe: {
+    label: "Peron Büfesi",
+    cost: 28000,
+    cps: 2.6,
+    repMod: -1,
+    risk: 6,
+    desc: "Bayat tost & sıcak ayran. İtibar hafif sarsılır, kasa sever.",
+  },
+  emanet: {
+    label: "Emanetçi",
+    cost: 45000,
+    cps: 4.4,
+    repMod: 1,
+    risk: 20,
+    desc: "Bırak çantanı kaptan. Yüksek kâr, zabıta riski.",
+  },
+  cayci: {
+    label: "Çay Ocağı",
+    cost: 22000,
+    cps: 1.7,
+    repMod: 1,
+    risk: 2,
+    desc: "İnce belli bardak, uzun sohbet.",
+  },
+  bilet: {
+    label: "Bilet Gişesi",
+    cost: 32000,
+    cps: 2.1,
+    repMod: 2,
+    risk: 0,
+    desc: "Resmî gişe — güven ve düzen.",
+  },
+  mescit: {
+    label: "Mescit",
+    cost: 15000,
+    cps: 0.35,
+    repMod: 4,
+    risk: 0,
+    desc: "Huzur + itibar.",
+  },
+  otopark: {
+    label: "Otopark",
+    cost: 40000,
+    cps: 1.9,
+    repMod: 0,
+    risk: 5,
+    desc: "Dolmuş ve özel araçlar için.",
+  },
+};
+
+export interface BusListing {
+  model: string;
+  name: string;
+  seatCount: number;
+  price: number;
+  fuelUse: number;
+  muavinCost: number;
+  engineHealth: number;
+  color: BusColor;
+}
+
+export const MARKET_BUSES: BusListing[] = [
+  { model: "O302", name: "Hurda O302", seatCount: 46, price: 45000, fuelUse: 32, muavinCost: 400, engineHealth: 55, color: "blue" },
+  { model: "O302", name: "Bakımlı O302", seatCount: 48, price: 75000, fuelUse: 30, muavinCost: 450, engineHealth: 78, color: "red" },
+  { model: "Travego", name: "Travego 15", seatCount: 52, price: 180000, fuelUse: 24, muavinCost: 700, engineHealth: 90, color: "white" },
+  { model: "Tourismo", name: "Tourismo", seatCount: 50, price: 220000, fuelUse: 22, muavinCost: 800, engineHealth: 92, color: "black" },
+  { model: "Setra", name: "Setra S416", seatCount: 54, price: 320000, fuelUse: 20, muavinCost: 950, engineHealth: 95, color: "orange" },
+  { model: "Neoplan", name: "Neoplan Cityliner", seatCount: 56, price: 410000, fuelUse: 18, muavinCost: 1100, engineHealth: 96, color: "green" },
+];
 
 export interface GameState {
   isGuest: boolean;
@@ -75,27 +160,26 @@ export interface GameState {
   lastEvent: RoadEvent | null;
   showComplaintModal: boolean;
   currentComplaint: string | null;
-
   officeMode: "drive" | "office";
   accountingLevel: number;
   customerServiceLevel: number;
   deskRented: boolean;
   pendingCustomer: CustomerCase | null;
-
   bankDebt: number;
   taxDue: number;
-
   terminalName: string;
   terminalSlots: TerminalSlot[];
   terminalBuilt: boolean;
-
   gameYear: number;
+  lastPassiveTick: number;
+  securityRisk: number;
 
   startAsGuest: () => void;
   setCompanyName: (name: string) => void;
   addMoney: (amount: number) => void;
   spendMoney: (amount: number) => boolean;
   paintBus: (busId: string, color: BusColor) => void;
+  buyBus: (listing: BusListing) => boolean;
   addExpedition: (exp: Expedition) => void;
   updateExpedition: (id: string, data: Partial<Expedition>) => void;
   openComplaint: (text: string) => void;
@@ -104,22 +188,21 @@ export interface GameState {
   clearLastEvent: () => void;
   setHasPlayedOnce: () => void;
   resetGame: () => void;
-
   setOfficeMode: (mode: "drive" | "office") => void;
   upgradeAccounting: () => boolean;
   upgradeCustomerService: () => boolean;
   rentDesk: () => boolean;
   spawnCustomer: () => void;
   resolveCustomer: (choice: "dismiss" | "help" | "compensate") => void;
-
   takeBankLoan: (amount: number) => void;
   payBankDebt: (amount: number) => boolean;
   payTax: () => boolean;
   accrueTax: (profit: number) => void;
-
   setTerminalName: (name: string) => void;
   startTerminalConstruction: () => boolean;
   buildSlot: (index: number, type: TerminalSlot) => boolean;
+  collectPassiveIncome: () => void;
+  triggerSecurityRaid: () => void;
   settleExpeditionProfit: (baseProfit: number) => number;
 }
 
@@ -130,6 +213,8 @@ const startingBus: GameBus = {
   engineHealth: 68,
   color: "blue",
   name: "Emektar",
+  fuelUse: 32,
+  muavinCost: 400,
 };
 
 const randomNames = [
@@ -146,34 +231,24 @@ export function generatePassengers(count: number): Passenger[] {
 }
 
 const ROAD_EVENTS: Omit<RoadEvent, "id">[] = [
-  { type: "eds", title: "EDS Flaş!", description: "Hız limitini aştın. Ceza yedin.", moneyChange: -1850, reputationChange: -1, emoji: "📸" },
-  { type: "police", title: "Trafik Çevirmesi", description: "Polis arabaları çeviriyor.", moneyChange: 0, reputationChange: 0, emoji: "🚓" },
-  { type: "accident", title: "Küçük Kaza", description: "Hafif temas. Hasar masrafı.", moneyChange: -8500, reputationChange: -3, emoji: "💥" },
-  { type: "lawsuit", title: "Dava Tehdidi!", description: "Yolcu avukat tuttu. Tazminat dosyası.", moneyChange: -15000, reputationChange: -5, emoji: "⚖️" },
-  { type: "fight", title: "Işıklarda Kavga", description: "İki sürücü tartışıyor.", moneyChange: 0, reputationChange: 1, emoji: "🥊" },
-  { type: "funny", title: "Muavin Anonsu", description: "Mikrofon açık unutuldu.", moneyChange: 0, reputationChange: -2, emoji: "🎙️" },
-  { type: "weather", title: "Ani Sağanak", description: "Yol kaydı.", moneyChange: 0, reputationChange: 0, emoji: "🌧️" },
+  { type: "eds", title: "EDS Flaş!", description: "Hız cezası.", moneyChange: -1850, reputationChange: -1, emoji: "📸" },
+  { type: "police", title: "Çevirme", description: "Kontrol noktası.", moneyChange: 0, reputationChange: 0, emoji: "🚓" },
+  { type: "accident", title: "Kaza", description: "Hasar masrafı.", moneyChange: -9000, reputationChange: -3, emoji: "💥" },
+  { type: "lawsuit", title: "Dava", description: "Tazminat dosyası.", moneyChange: -15000, reputationChange: -5, emoji: "⚖️" },
+  { type: "fight", title: "Kavga", description: "Yol kenarı olay.", moneyChange: 0, reputationChange: 1, emoji: "🥊" },
+  { type: "funny", title: "Anons", description: "Mikrofon açık kaldı.", moneyChange: 0, reputationChange: -2, emoji: "🎙️" },
+  { type: "weather", title: "Sağanak", description: "Tempo düştü.", moneyChange: 0, reputationChange: 0, emoji: "🌧️" },
 ];
 
 const CUSTOMERS: Omit<CustomerCase, "id">[] = [
-  { name: "Ayşe Teyze", issue: "Valizim kayboldu. İçinde torununun sünnet takımı vardı!", mood: "angry", type: "lost_item" },
-  { name: "Murat Bey", issue: "Ceketimi unuttum. Cebinde nüfus cüzdanı vardı.", mood: "polite", type: "lost_item" },
-  { name: "Cemal Amca", issue: "Şoför 'eşya bizden sorulmaz' dedi. Peki kimin sorulur?", mood: "ironic", type: "rude" },
-  { name: "Elif Hanım", issue: "Çocuğumun tableti kayıp. Eşya nerede?", mood: "polite", type: "lost_item" },
-  { name: "Serkan", issue: "3 saat rötar. İş görüşmem uçtu.", mood: "angry", type: "delay" },
-  { name: "Avukat Dündar", issue: "Müvekkilim kaza sonrası şikayetçi. Tazminat konuşalım.", mood: "angry", type: "accident_claim" },
+  { name: "Ayşe Teyze", issue: "Valizim kayboldu!", mood: "angry", type: "lost_item" },
+  { name: "Murat Bey", issue: "Ceketimi unuttum.", mood: "polite", type: "lost_item" },
+  { name: "Cemal Amca", issue: "Eşya bizden sorulmaz mı?", mood: "ironic", type: "rude" },
+  { name: "Serkan", issue: "3 saat rötar.", mood: "angry", type: "delay" },
+  { name: "Avukat Dündar", issue: "Tazminat konuşalım.", mood: "angry", type: "accident_claim" },
 ];
 
 const emptySlots = (): TerminalSlot[] => Array.from({ length: 6 }).map(() => "empty");
-
-const SLOT_COST: Record<Exclude<TerminalSlot, "empty">, number> = {
-  toilet: 18000,
-  bakkal: 35000,
-  cayci: 22000,
-  bilet: 28000,
-  mescit: 15000,
-  otopark: 40000,
-};
 
 export const useGameStore = create<GameState>()(
   persist(
@@ -200,6 +275,8 @@ export const useGameStore = create<GameState>()(
       terminalSlots: emptySlots(),
       terminalBuilt: false,
       gameYear: 1987,
+      lastPassiveTick: Date.now(),
+      securityRisk: 0,
 
       startAsGuest: () =>
         set({
@@ -225,19 +302,40 @@ export const useGameStore = create<GameState>()(
           terminalSlots: emptySlots(),
           terminalBuilt: false,
           gameYear: 1987,
+          lastPassiveTick: Date.now(),
+          securityRisk: 0,
         }),
 
       setCompanyName: (name) => set({ companyName: name }),
-      addMoney: (amount) => set((s) => ({ balance: s.balance + amount })),
-      spendMoney: (amount) => {
-        if (get().balance < amount) return false;
-        set((s) => ({ balance: s.balance - amount }));
+      addMoney: (a) => set((s) => ({ balance: s.balance + a })),
+      spendMoney: (a) => {
+        if (get().balance < a) return false;
+        set((s) => ({ balance: s.balance - a }));
         return true;
       },
-      paintBus: (busId, color) =>
+      paintBus: (id, color) =>
+        set((s) => ({ buses: s.buses.map((b) => (b.id === id ? { ...b, color } : b)) })),
+
+      buyBus: (listing) => {
+        const { balance } = get();
+        if (balance < listing.price) return false;
+        const bus: GameBus = {
+          id: `bus-${Date.now()}`,
+          model: listing.model,
+          name: listing.name,
+          seatCount: listing.seatCount,
+          engineHealth: listing.engineHealth,
+          color: listing.color,
+          fuelUse: listing.fuelUse,
+          muavinCost: listing.muavinCost,
+        };
         set((s) => ({
-          buses: s.buses.map((b) => (b.id === busId ? { ...b, color } : b)),
-        })),
+          balance: s.balance - listing.price,
+          buses: [...s.buses, bus],
+        }));
+        return true;
+      },
+
       addExpedition: (exp) => set((s) => ({ expeditions: [exp, ...s.expeditions] })),
       updateExpedition: (id, data) =>
         set((s) => ({
@@ -257,8 +355,8 @@ export const useGameStore = create<GameState>()(
           Math.random() > 0.86
             ? ROAD_EVENTS.filter((e) => e.type === "accident" || e.type === "lawsuit")
             : ROAD_EVENTS;
-        const template = pool[Math.floor(Math.random() * pool.length)];
-        const event: RoadEvent = { ...template, id: `evt-${Date.now()}` };
+        const t = pool[Math.floor(Math.random() * pool.length)];
+        const event: RoadEvent = { ...t, id: `evt-${Date.now()}` };
         set((s) => ({
           balance: s.balance + event.moneyChange,
           reputation: Math.max(0, Math.min(100, s.reputation + event.reputationChange)),
@@ -272,7 +370,6 @@ export const useGameStore = create<GameState>()(
       clearLastEvent: () => set({ lastEvent: null }),
       setHasPlayedOnce: () => set({ hasPlayedOnce: true }),
       resetGame: () => get().startAsGuest(),
-
       setOfficeMode: (mode) => set({ officeMode: mode }),
 
       upgradeAccounting: () => {
@@ -297,7 +394,7 @@ export const useGameStore = create<GameState>()(
       },
       spawnCustomer: () => {
         const c = CUSTOMERS[Math.floor(Math.random() * CUSTOMERS.length)];
-        set({ pendingCustomer: { ...c, id: `cust-${Date.now()}` } });
+        set({ pendingCustomer: { ...c, id: `c-${Date.now()}` } });
       },
       resolveCustomer: (choice) => {
         const { pendingCustomer, customerServiceLevel, reputation, balance } = get();
@@ -310,23 +407,13 @@ export const useGameStore = create<GameState>()(
             reputation: Math.min(100, reputation + 2 + customerServiceLevel),
           });
         } else {
-          const pay =
-            pendingCustomer.type === "accident_claim"
-              ? 12000
-              : 800 + customerServiceLevel * 300;
-          set({
-            pendingCustomer: null,
-            balance: balance - pay,
-            reputation: Math.min(100, reputation + 6),
-          });
+          const pay = pendingCustomer.type === "accident_claim" ? 12000 : 800 + customerServiceLevel * 300;
+          set({ pendingCustomer: null, balance: balance - pay, reputation: Math.min(100, reputation + 6) });
         }
       },
 
       takeBankLoan: (amount) =>
-        set((s) => ({
-          balance: s.balance + amount,
-          bankDebt: s.bankDebt + Math.round(amount * 1.15),
-        })),
+        set((s) => ({ balance: s.balance + amount, bankDebt: s.bankDebt + Math.round(amount * 1.15) })),
       payBankDebt: (amount) => {
         const { balance, bankDebt } = get();
         const pay = Math.min(amount, bankDebt, balance);
@@ -354,24 +441,65 @@ export const useGameStore = create<GameState>()(
           terminalBuilt: true,
           terminalName: get().terminalName || "Yeni Terminal",
           reputation: Math.min(100, get().reputation + 8),
+          lastPassiveTick: Date.now(),
         });
         return true;
       },
       buildSlot: (index, type) => {
-        const { terminalBuilt, terminalSlots, balance } = get();
+        const { terminalBuilt, terminalSlots, balance, reputation } = get();
         if (!terminalBuilt || type === "empty") return false;
-        if (index < 0 || index >= terminalSlots.length) return false;
         if (terminalSlots[index] !== "empty") return false;
-        const cost = SLOT_COST[type];
-        if (balance < cost) return false;
+        const info = SLOT_INFO[type];
+        if (balance < info.cost) return false;
         const next = [...terminalSlots];
         next[index] = type;
         set({
-          balance: balance - cost,
+          balance: balance - info.cost,
           terminalSlots: next,
-          reputation: Math.min(100, get().reputation + 1),
+          reputation: Math.min(100, Math.max(0, reputation + info.repMod)),
+          securityRisk: Math.min(
+            100,
+            next.reduce((a, s) => a + (s === "empty" ? 0 : SLOT_INFO[s].risk), 0)
+          ),
         });
         return true;
+      },
+
+      collectPassiveIncome: () => {
+        const now = Date.now();
+        const { lastPassiveTick, terminalSlots, terminalBuilt } = get();
+        if (!terminalBuilt) {
+          set({ lastPassiveTick: now });
+          return;
+        }
+        const sec = Math.min(90, (now - lastPassiveTick) / 1000);
+        if (sec < 1) return;
+        let cps = 0;
+        terminalSlots.forEach((s) => {
+          if (s !== "empty") cps += SLOT_INFO[s].cps;
+        });
+        const gain = Math.round(cps * sec * 10) / 10;
+        set((st) => ({ balance: st.balance + gain, lastPassiveTick: now }));
+      },
+
+      triggerSecurityRaid: () => {
+        const { securityRisk, balance, reputation } = get();
+        if (securityRisk < 22) return;
+        if (Math.random() > securityRisk / 130) return;
+        const fine = 2500 + Math.floor(securityRisk * 90);
+        set({
+          balance: balance - fine,
+          reputation: Math.max(0, reputation - 3),
+          lastEvent: {
+            id: `raid-${Date.now()}`,
+            type: "police",
+            title: "Zabıta Baskını",
+            description: "Emanet / büfe denetimi. Usulsüzlük cezası.",
+            moneyChange: -fine,
+            reputationChange: -3,
+            emoji: "🚨",
+          },
+        });
       },
 
       settleExpeditionProfit: (baseProfit) => {
