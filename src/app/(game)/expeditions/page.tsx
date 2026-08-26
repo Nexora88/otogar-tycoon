@@ -132,7 +132,13 @@ export default function ExpeditionsPage() {
             triggerRoadEvent(exp.id);
           }
 
-          if (Date.now() - exp.departureTime > 26000) {
+          // Mesafeye göre sürüş süresi (ms) — min 90sn, max 3dk
+const driveMs = Math.min(
+  180000,
+  Math.max(90000, (route?.distance || 400) * 180)
+);
+
+if (Date.now() - exp.departureTime > driveMs) {
             const bus = buses.find((b) => b.id === exp.busId);
             const consumption = FUEL_CONSUMPTION[bus?.model || "O302"] || 28;
             const fuelCost = Math.round(
