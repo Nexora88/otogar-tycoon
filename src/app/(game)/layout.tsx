@@ -7,6 +7,8 @@ import {
   Warehouse,
   Route,
   ShoppingBag,
+  Building2,
+  Landmark,
   LogOut,
   Bus,
 } from "lucide-react";
@@ -18,6 +20,8 @@ const menuItems = [
   { href: "/dashboard", label: "Panel", icon: LayoutDashboard },
   { href: "/garage", label: "Garaj", icon: Warehouse },
   { href: "/expeditions", label: "Seferler", icon: Route },
+  { href: "/office", label: "Ofis", icon: Landmark },
+  { href: "/terminal", label: "Terminalim", icon: Building2 },
   { href: "/market", label: "Pazar", icon: ShoppingBag },
 ];
 
@@ -27,11 +31,12 @@ export default function GameLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const { companyName, balance, reputation, isGuest } = useGameStore();
+  const { companyName, balance, reputation, isGuest, bankDebt, taxDue } =
+    useGameStore();
 
   return (
     <div className="min-h-screen flex bg-[#0a0a0b]">
-      <aside className="w-64 border-r border-zinc-800 flex flex-col">
+      <aside className="w-64 border-r border-zinc-800 flex flex-col shrink-0">
         <div className="p-5 border-b border-zinc-800 flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-amber-500 flex items-center justify-center">
             <Bus className="w-5 h-5 text-black" />
@@ -50,9 +55,10 @@ export default function GameLayout({
           )}
         </div>
 
-        <nav className="flex-1 p-3 space-y-1">
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {menuItems.map((item) => {
-            const active = pathname === item.href;
+            const active =
+              pathname === item.href || pathname.startsWith(item.href + "/");
             const Icon = item.icon;
             return (
               <Link
@@ -64,7 +70,7 @@ export default function GameLayout({
                     : "text-zinc-400 hover:bg-zinc-900 hover:text-white"
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="w-4 h-4 shrink-0" />
                 {item.label}
               </Link>
             );
@@ -82,6 +88,18 @@ export default function GameLayout({
             <div className="text-xs text-zinc-500">İtibar</div>
             <div className="text-sm font-medium">{reputation}/100</div>
           </div>
+          {bankDebt > 0 && (
+            <div>
+              <div className="text-xs text-zinc-500">Banka borcu</div>
+              <div className="text-sm text-red-400/90">{formatMoney(bankDebt)}</div>
+            </div>
+          )}
+          {taxDue > 0 && (
+            <div>
+              <div className="text-xs text-zinc-500">Vergi</div>
+              <div className="text-sm text-amber-600/90">{formatMoney(taxDue)}</div>
+            </div>
+          )}
 
           <Link
             href="/"
@@ -93,7 +111,7 @@ export default function GameLayout({
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto">{children}</main>
+      <main className="flex-1 overflow-auto min-w-0">{children}</main>
 
       <ComplaintModal />
     </div>
