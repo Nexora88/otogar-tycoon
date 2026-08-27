@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useGameStore } from "@/store/gameStore";
 import { formatMoney } from "@/lib/utils";
+import LoanContractModal from "@/components/LoanContractModal";
 import {
   Calculator,
   Headphones,
@@ -46,26 +47,28 @@ export default function OfficePage() {
     pendingCustomer,
     spawnCustomer,
     resolveCustomer,
-    takeBankLoan,
     payBankDebt,
     payTax,
     setOfficeMode,
   } = useGameStore();
 
   const [quoteI, setQuoteI] = useState(0);
-  const [loanInput, setLoanInput] = useState(10000);
+  const [loanOpen, setLoanOpen] = useState(false);
   const day = new Date().getDate();
   const month = MONTHS[new Date().getMonth()];
 
   useEffect(() => {
     const t = setInterval(() => {
-      if (!pendingCustomer && Math.random() > 0.7) spawnCustomer();
-    }, 17000);
+      if (!pendingCustomer && Math.random() > 0.72) spawnCustomer();
+    }, 16000);
     return () => clearInterval(t);
   }, [pendingCustomer, spawnCustomer]);
 
   useEffect(() => {
-    const t = setInterval(() => setQuoteI((i) => (i + 1) % QUOTES.length), 9000);
+    const t = setInterval(
+      () => setQuoteI((i) => (i + 1) % QUOTES.length),
+      9000
+    );
     return () => clearInterval(t);
   }, []);
 
@@ -77,8 +80,12 @@ export default function OfficePage() {
       <div className="p-6 md:p-8 max-w-6xl mx-auto">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-amber-100">Yönetim Yazıhanesi</h1>
-            <p className="text-stone-500 text-sm">Muhasebe · Vergi · Banka · Müşteri</p>
+            <h1 className="text-2xl font-bold text-amber-100">
+              Yönetim Yazıhanesi
+            </h1>
+            <p className="text-stone-500 text-sm">
+              Muhasebe · Vergi · Banka (A4) · Müşteri
+            </p>
           </div>
           <div className="flex gap-2">
             <Link
@@ -101,8 +108,12 @@ export default function OfficePage() {
               <div className="w-16 h-16 rounded-full bg-stone-600 mb-2 flex items-center justify-center text-2xl text-stone-400 font-serif">
                 A
               </div>
-              <div className="text-amber-200/90 text-xs font-semibold">MUSTAFA KEMAL</div>
-              <div className="text-amber-200/60 text-[10px] tracking-widest">ATATÜRK</div>
+              <div className="text-amber-200/90 text-xs font-semibold">
+                MUSTAFA KEMAL
+              </div>
+              <div className="text-amber-200/60 text-[10px] tracking-widest">
+                ATATÜRK
+              </div>
             </div>
           </div>
           <div className="md:col-span-6 bg-stone-900/70 border border-stone-700 rounded p-5 flex flex-col justify-between">
@@ -112,7 +123,9 @@ export default function OfficePage() {
                 “{QUOTES[quoteI]}”
               </p>
             </div>
-            <p className="text-[11px] text-stone-500 mt-3">Gazi Mustafa Kemal Atatürk</p>
+            <p className="text-[11px] text-stone-500 mt-3">
+              Gazi Mustafa Kemal Atatürk
+            </p>
           </div>
           <div className="md:col-span-3 bg-[#2a2218] border border-stone-600 rounded overflow-hidden">
             <div className="bg-red-900 text-center text-white text-xs font-bold py-1 tracking-widest">
@@ -126,25 +139,20 @@ export default function OfficePage() {
           </div>
         </div>
 
-        {/* === MUHASEBE DETAY === */}
+        {/* Muhasebe */}
         <div className="bg-stone-900/80 border border-stone-700 rounded-lg p-5 mb-6">
           <div className="flex items-center gap-2 mb-4">
             <Scale className="w-5 h-5 text-emerald-400" />
-            <h2 className="font-bold text-lg">Muhasebe & Vergi Dairesi</h2>
+            <h2 className="font-bold text-lg">Muhasebe & Vergi</h2>
             <span className="text-xs text-stone-500 ml-auto">
-              Seviye {accountingLevel}/5 · kâr +%{accountingLevel * 5}
+              Sv. {accountingLevel}/5 · kâr +%{accountingLevel * 5}
             </span>
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+            <TaxCard title="Kasa" value={formatMoney(balance)} sub="Nakit" color="text-amber-400" />
             <TaxCard
-              title="Kasa"
-              value={formatMoney(balance)}
-              sub="Nakit"
-              color="text-amber-400"
-            />
-            <TaxCard
-              title="KDV tahakkuk"
+              title="KDV"
               value={formatMoney(kdvDue ?? 0)}
               sub="%8 sefer kârı"
               color="text-sky-400"
@@ -156,7 +164,7 @@ export default function OfficePage() {
               color="text-violet-400"
             />
             <TaxCard
-              title="Toplam borç vergi"
+              title="Toplam vergi"
               value={formatMoney(taxDue)}
               sub="Ödenecek"
               color="text-red-400"
@@ -169,14 +177,14 @@ export default function OfficePage() {
               onClick={() => {
                 if (!payTax()) alert("Vergi yok veya kasa yetersiz");
               }}
-              className="px-4 py-2 rounded-lg bg-emerald-800/40 border border-emerald-700 text-emerald-200 text-sm hover:bg-emerald-800/60"
+              className="px-4 py-2 rounded-lg bg-emerald-800/40 border border-emerald-700 text-emerald-200 text-sm"
             >
-              Tüm vergileri öde ({formatMoney(taxDue)})
+              Vergileri öde ({formatMoney(taxDue)})
             </button>
             <button
               type="button"
               onClick={() => {
-                if (!upgradeAccounting()) alert("Yetersiz bakiye veya max seviye");
+                if (!upgradeAccounting()) alert("Yetersiz bakiye veya max");
               }}
               disabled={accountingLevel >= 5}
               className="px-4 py-2 rounded-lg border border-stone-600 text-sm text-stone-300 disabled:opacity-40"
@@ -187,17 +195,19 @@ export default function OfficePage() {
 
           <div className="text-xs text-stone-500 mb-2 flex items-center gap-1">
             <FileText className="w-3.5 h-3.5" />
-            Defter-i kebir (son hareketler)
+            Defter-i kebir
           </div>
           <div className="max-h-40 overflow-y-auto rounded border border-stone-800 bg-stone-950/80">
             {(ledger ?? []).length === 0 ? (
-              <p className="p-3 text-xs text-stone-600">Henüz kayıt yok. Sefer bitince dolacak.</p>
+              <p className="p-3 text-xs text-stone-600">
+                Kayıt yok. Sefer veya kredi sonrası dolar.
+              </p>
             ) : (
               <table className="w-full text-xs">
                 <thead className="text-stone-500 border-b border-stone-800">
                   <tr>
-                    <th className="text-left p-2 font-medium">Açıklama</th>
-                    <th className="text-right p-2 font-medium">Tutar</th>
+                    <th className="text-left p-2">Açıklama</th>
+                    <th className="text-right p-2">Tutar</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -218,58 +228,44 @@ export default function OfficePage() {
               </table>
             )}
           </div>
-          <p className="text-[10px] text-stone-600 mt-2">
-            Not: KDV %8 + gelir payı %5 sefer kârından tahakkuk eder. Muhasebe seviyesi net kârı artırır.
-          </p>
         </div>
 
-        {/* Banka */}
+        {/* Banka + özet */}
         <div className="grid md:grid-cols-2 gap-4 mb-6">
           <div className="bg-stone-900/70 border border-stone-700 rounded-lg p-5">
             <div className="flex items-center gap-2 mb-3">
               <Landmark className="w-4 h-4 text-amber-500" />
               <span className="font-semibold">Banka kredisi</span>
             </div>
-            <p className="text-sm text-stone-500 mb-2">
-              Borç: <span className="text-red-400 font-mono">{formatMoney(bankDebt)}</span>
-              <span className="text-stone-600"> · limit ~50.000</span>
+            <p className="text-sm text-stone-500 mb-3">
+              Borç:{" "}
+              <span className="text-red-400 font-mono">
+                {formatMoney(bankDebt)}
+              </span>
             </p>
-            <div className="flex flex-wrap gap-2 items-center mb-2">
-              <input
-                type="number"
-                min={1000}
-                max={50000}
-                step={1000}
-                value={loanInput}
-                onChange={(e) => setLoanInput(Number(e.target.value))}
-                className="w-28 bg-stone-950 border border-stone-600 rounded px-2 py-1.5 text-sm"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  if (!takeBankLoan(loanInput)) alert("Limit veya tutar geçersiz");
-                }}
-                className="px-3 py-1.5 text-xs rounded border border-stone-600 hover:border-amber-600"
-              >
-                Kredi çek (%12 faizle borç yazılır)
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!payBankDebt(10000)) alert("Ödeme yapılamadı");
-                }}
-                className="px-3 py-1.5 text-xs rounded border border-stone-600 hover:border-emerald-600"
-              >
-                10.000 öde
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setLoanOpen(true)}
+              className="w-full py-2.5 rounded-lg bg-amber-900/50 border border-amber-600 text-amber-100 text-sm font-medium hover:bg-amber-900/70"
+            >
+              Kredi başvurusu (A4 sözleşme)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!payBankDebt(10000)) alert("Ödeme yapılamadı");
+              }}
+              className="w-full mt-2 py-2 rounded-lg border border-stone-600 text-xs text-stone-300"
+            >
+              10.000 ₺ borç öde
+            </button>
           </div>
 
           <div className="bg-stone-900/70 border border-stone-700 rounded-lg p-5">
             <div className="font-semibold mb-2">Özet</div>
             <ul className="text-sm text-stone-400 space-y-1">
               <li>İtibar: {reputation}/100</li>
-              <li>Muhasebe bonusu: +%{accountingLevel * 5} sefer kârı</li>
+              <li>Muhasebe: +%{accountingLevel * 5} sefer kârı</li>
               <li>Müşteri hizmetleri: Sv. {customerServiceLevel}</li>
               <li>Yazıhane: {deskRented ? "Kiralı" : "Boş"}</li>
             </ul>
@@ -282,7 +278,7 @@ export default function OfficePage() {
             icon={<Calculator className="w-5 h-5 text-emerald-400" />}
             title="Muhasebe ofisi"
             level={`Sv. ${accountingLevel}/5`}
-            desc="Defter, vergi, kâr optimizasyonu."
+            desc="Defter, vergi, kâr."
             btn={accountingLevel >= 5 ? "Max" : `Yükselt ${formatMoney(accCost)}`}
             onClick={() => {
               if (!upgradeAccounting()) alert("Olmadı");
@@ -320,6 +316,7 @@ export default function OfficePage() {
         </Link>
       </div>
 
+      {/* Müşteri modal */}
       {pendingCustomer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4">
           <div className="bg-stone-900 border border-stone-600 rounded-lg max-w-md w-full p-6">
@@ -364,6 +361,9 @@ export default function OfficePage() {
           </div>
         </div>
       )}
+
+      {/* A4 kredi sözleşmesi */}
+      <LoanContractModal open={loanOpen} onClose={() => setLoanOpen(false)} />
     </div>
   );
 }
@@ -381,7 +381,9 @@ function TaxCard({
 }) {
   return (
     <div className="bg-stone-950 border border-stone-800 rounded-lg p-3">
-      <div className="text-[10px] text-stone-500 uppercase tracking-wider">{title}</div>
+      <div className="text-[10px] text-stone-500 uppercase tracking-wider">
+        {title}
+      </div>
       <div className={`text-lg font-bold font-mono ${color}`}>{value}</div>
       <div className="text-[10px] text-stone-600">{sub}</div>
     </div>
