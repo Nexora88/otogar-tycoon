@@ -8,88 +8,70 @@ interface DrivingViewProps {
 }
 
 type CamMode = "cockpit" | "hood" | "top";
-type Weather = "clear" | "rain";
 
-interface Traffic {
+interface Ent {
   id: number;
+  z: number;
   lane: number;
-  z: number;
+  kind: "car" | "truck" | "bus" | "police";
   color: string;
-  kind: "car" | "truck" | "police" | "ambulance";
-  drift: number;
 }
 
-interface Prop {
+interface Scenery {
   id: number;
-  side: "left" | "right";
   z: number;
-  kind: "tree" | "house" | "trash" | "sign" | "billboard" | "barrier" | "simit" | "crosswalk";
-}
-
-interface DamageZone {
-  id: string;
-  label: string;
-  x: string;
-  y: string;
+  side: -1 | 1;
+  kind: "tree" | "house" | "apartment" | "pole" | "station" | "shop" | "fence";
 }
 
 const SIGNS = [
-  "🚏 KEŞAN OTOBÜS TERMİNALİ",
-  "🇹🇷 MUSTAFA KEMAL'İN ASKERLERİYİZ",
-  "🗺️ ANKARA YÖNÜ",
-  "⚠️ HIZ 90",
-  "⛽ DİNLENME 12 KM",
+  "KEŞAN OTOBÜS TERMİNALİ",
+  "MUSTAFA KEMAL'İN ASKERLERİYİZ",
+  "ANKARA YÖNÜ · 160 KM",
+  "HIZ SINIRI 90",
+  "DİNLENME / BENZİNLİK 8 KM",
 ];
 
 export default function DrivingView({ expeditionId }: DrivingViewProps) {
   const exp = useGameStore((s) =>
     s.expeditions.find((e) => e.id === expeditionId)
   );
-  const triggerRoadEvent = useGameStore((s) => s.triggerRoadEvent);
 
   const [cam, setCam] = useState<CamMode>("cockpit");
-  const [x, setX] = useState(0); // -1..1 şerit ofset
-  const [tilt, setTilt] = useState(0);
+  const [lane, setLane] = useState(0);
+  const [steer, setSteer] = useState(0);
   const [speed, setSpeed] = useState(0);
-  const [targetSpeed, setTargetSpeed] = useState(0);
+  const [want, setWant] = useState(0);
   const [signal, setSignal] = useState<"none" | "left" | "right">("none");
   const [wiper, setWiper] = useState(false);
-  const [weather, setWeather] = useState<Weather>("clear");
-  const [fuel, setFuel] = useState(78);
-  const [kmLeft, setKmLeft] = useState(180);
-  const [progress, setProgress] = useState(0); // 0 terminal → 1 varış
-  const [wrongWay, setWrongWay] = useState(false);
-  const [damages, setDamages] = useState<DamageZone[]>([]);
-  const [traffic, setTraffic] = useState<Traffic[]>([]);
-  const [props, setProps] = useState<Prop[]>([]);
-  const [signText, setSignText] = useState(SIGNS[0]);
+  const [fuel, setFuel] = useState(70);
+  const [km, setKm] = useState(170);
+  const [prog, setProg] = useState(0);
+  const [ents, setEnts] = useState<Ent[]>([]);
+  const [scene, setScene] = useState<Scenery[]>([]);
+  const [sign, setSign] = useState(SIGNS[0]);
   const [showSign, setShowSign] = useState(false);
-  const [pedestrians, setPedestrians] = useState<
-    { id: number; x: number; z: number; crossing: boolean }[]
-  >([]);
+  const [atStation, setAtStation] = useState(false);
+  const [dash, setDash] = useState(0);
   const keys = useRef<Record<string, boolean>>({});
 
-  const night = false;
-  const blur = weather === "rain" && !wiper;
-
-  // Klavye
   useEffect(() => {
     const dn = (e: KeyboardEvent) => {
+      keys.current[e.key.toLowerCase()] = true;
       const k = e.key.toLowerCase();
-      keys.current[k] = true;
-      if (k === "c") {
+      if (k === "c")
         setCam((c) =>
           c === "cockpit" ? "hood" : c === "hood" ? "top" : "cockpit"
         );
-      }
       if (k === "q") setSignal((s) => (s === "left" ? "none" : "left"));
       if (k === "e") setSignal((s) => (s === "right" ? "none" : "right"));
       if (e.key === " ") {
         e.preventDefault();
         setWiper((v) => !v);
       }
-      if (k === "h") {
-        // Korna — ileride ses; şimdilik görsel flash yok
+      if (k === "f" && atStation) {
+        setFuel((f) => Math.min(100, f + 25));
+        setAtStation(false);
       }
     };
     const up = (e: KeyboardEvent) => {
@@ -101,473 +83,430 @@ export default function DrivingView({ expeditionId }: DrivingViewProps) {
       window.removeEventListener("keydown", dn);
       window.removeEventListener("keyup", up);
     };
-  }, []);
+  }, [atStation]);
 
-  // Ana döngü — yavaş hızlanma
   useEffect(() => {
-    let id: number;
+    let raf = 0;
     let last = performance.now();
-    const tick = (now: number) => {
-      const dt = Math.min(40, now - last) / 16;
+    const loop = (now: number) => {
+      const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
 
-      let gas = 0;
-      if (keys.current["w"] || keys.current["arrowup"]) gas = 1;
-      if (keys.current["s"] || keys.current["arrowdown"]) gas = -1;
+      if (keys.current["w"] || keys.current["arrowup"])
+        setWant((w) => Math.min(100, w + 22 * dt));
+      else if (keys.current["s"] || keys.current["arrowdown"])
+        setWant((w) => Math.max(0, w - 35 * dt));
+      else setWant((w) => Math.max(0, w - 6 * dt));
 
-      // Hedef hız yavaş değişir
-      setTargetSpeed((ts) => {
-        if (gas > 0) return Math.min(110, ts + 1.1 * dt);
-        if (gas < 0) return Math.max(0, ts - 2.2 * dt);
-        return Math.max(0, ts - 0.25 * dt);
-      });
+      setSpeed((s) => s + (want - s) * Math.min(1, 2.5 * dt));
 
-      setSpeed((s) => {
-        const next = s + (targetSpeed - s) * 0.08 * dt;
-        return Math.max(0, Math.min(115, next));
-      });
+      let dir = 0;
+      if (keys.current["a"] || keys.current["arrowleft"]) dir = -1;
+      if (keys.current["d"] || keys.current["arrowright"]) dir = 1;
+      setSteer(dir * 14);
+      setLane((L) => Math.max(-1, Math.min(1, L + dir * 1.4 * dt)));
 
-      if (blur) setSpeed((s) => Math.min(s, 55));
+      const sp = want;
+      setDash((d) => (d + sp * dt * 2) % 36);
+      if (sp > 2) {
+        setKm((k) => Math.max(0, k - sp * dt * 0.018));
+        setFuel((f) => Math.max(0, f - sp * dt * 0.007));
+        setProg((p) => Math.min(1, p + sp * dt * 0.00012));
+      }
 
-      let steer = 0;
-      if (keys.current["a"] || keys.current["arrowleft"]) steer = -1;
-      if (keys.current["d"] || keys.current["arrowright"]) steer = 1;
-
-      setX((prev) => {
-        let n = prev + steer * 0.035 * dt * (0.4 + speed / 120);
-        // Yol dışı / yanlış yön
-        if (n > 0.92 || n < -0.92) {
-          setWrongWay(true);
-          n = Math.max(-0.95, Math.min(0.95, n));
-        } else {
-          setWrongWay(false);
+      setEnts((prev) => {
+        let n = prev
+          .map((e) => ({ ...e, z: e.z + (0.4 + sp * 0.01) * dt * 55 }))
+          .filter((e) => e.z < 102);
+        if (Math.random() < 0.035 && n.length < 8) {
+          const kinds: Ent["kind"][] = ["car", "car", "truck", "bus", "police"];
+          const kind = kinds[Math.floor(Math.random() * kinds.length)];
+          n.push({
+            id: Math.random(),
+            z: 4,
+            lane: [-0.65, 0, 0.65][Math.floor(Math.random() * 3)],
+            kind,
+            color:
+              kind === "police"
+                ? "#1e3a8a"
+                : kind === "bus"
+                ? "#ca8a04"
+                : ["#dc2626", "#2563eb", "#78716c", "#fafafa", "#171717"][
+                    Math.floor(Math.random() * 5)
+                  ],
+          });
         }
-        setTilt(steer * 2.8);
         return n;
       });
 
-      // İlerleme & yakıt & km
-      if (speed > 5) {
-        setProgress((p) => Math.min(1, p + (speed * dt) / 180000));
-        setKmLeft((k) => Math.max(0, k - (speed * dt) / 9000));
-        setFuel((f) => Math.max(0, f - (speed * dt) / 25000));
-      }
-
-      // Trafik
-      setTraffic((prev) =>
-        prev
-          .map((t) => ({
-            ...t,
-            z: t.z + t.drift + speed / 100,
-            lane: t.lane + (Math.random() > 0.995 ? (Math.random() > 0.5 ? 0.15 : -0.15) : 0),
-          }))
-          .filter((t) => t.z < 110)
-      );
-
-      setProps((prev) =>
-        prev
-          .map((p) => ({ ...p, z: p.z + 1.2 + speed / 80 }))
-          .filter((p) => p.z < 115)
-      );
-
-      setPedestrians((prev) =>
-        prev
-          .map((p) => ({
-            ...p,
-            z: p.z + 0.8 + speed / 90,
-            x: p.crossing ? p.x + 0.4 * dt : p.x,
-          }))
-          .filter((p) => p.z < 110)
-      );
-
-      id = requestAnimationFrame(tick);
-    };
-    id = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(id);
-  }, [targetSpeed, speed, blur]);
-
-  // Spawn
-  useEffect(() => {
-    const t = setInterval(() => {
-      setTraffic((prev) => {
-        if (prev.length > 8) return prev;
-        if (Math.random() > 0.55) {
-          const kinds: Traffic["kind"][] = ["car", "car", "truck", "police", "ambulance"];
-          const kind = kinds[Math.floor(Math.random() * kinds.length)];
-          return [
-            ...prev,
-            {
-              id: Date.now() + Math.random(),
-              lane: (Math.random() - 0.5) * 1.4,
-              z: 2,
-              color:
-                kind === "police"
-                  ? "#1e3a8a"
-                  : kind === "ambulance"
-                  ? "#f8fafc"
-                  : ["#b91c1c", "#a16207", "#374151", "#1d4ed8"][
-                      Math.floor(Math.random() * 4)
-                    ],
-              kind,
-              drift: 0.8 + Math.random(),
-            },
-          ];
-        }
-        return prev;
-      });
-
-      setProps((prev) => {
-        if (Math.random() > 0.4) {
-          const kinds: Prop["kind"][] = [
+      setScene((prev) => {
+        let n = prev
+          .map((s) => ({ ...s, z: s.z + (0.45 + sp * 0.012) * dt * 55 }))
+          .filter((s) => s.z < 105);
+        if (Math.random() < 0.07 && n.length < 16) {
+          const kinds: Scenery["kind"][] = [
             "tree",
             "tree",
             "house",
-            "trash",
-            "billboard",
-            "sign",
-            "simit",
-            "crosswalk",
+            "apartment",
+            "pole",
+            "shop",
+            "fence",
+            "station",
           ];
-          // Yanlış şeritte bariyer
-          const kind =
-            Math.abs(x) > 0.85 && Math.random() > 0.7
-              ? "barrier"
-              : kinds[Math.floor(Math.random() * kinds.length)];
-          return [
-            ...prev,
-            {
-              id: Date.now() + Math.random(),
-              side: Math.random() > 0.5 ? "left" : "right",
-              z: 3,
-              kind,
-            },
-          ];
+          const kind = kinds[Math.floor(Math.random() * kinds.length)];
+          n.push({
+            id: Math.random(),
+            z: 6,
+            side: Math.random() > 0.5 ? 1 : -1,
+            kind,
+          });
+          if (kind === "station" && sp < 40) setAtStation(true);
         }
-        return prev;
+        return n;
       });
 
-      if (Math.random() > 0.85) {
-        setPedestrians((prev) => [
-          ...prev,
-          {
-            id: Date.now(),
-            x: -20,
-            z: 5,
-            crossing: Math.random() > 0.5,
-          },
-        ]);
-      }
-    }, 400);
-    return () => clearInterval(t);
-  }, [x]);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [want]);
 
-  // Tabela
   useEffect(() => {
     const t = setInterval(() => {
-      setSignText(SIGNS[Math.floor(Math.random() * SIGNS.length)]);
+      setSign(SIGNS[Math.floor(Math.random() * SIGNS.length)]);
       setShowSign(true);
-      setTimeout(() => setShowSign(false), 4000);
-    }, 9000);
+      setTimeout(() => setShowSign(false), 3800);
+    }, 11000);
     return () => clearInterval(t);
   }, []);
 
-  // Kaza → rastgele hasar bölgesi
-  useEffect(() => {
-    if (Math.random() > 0.999 && speed > 60 && exp) {
-      const zones = [
-        { id: "fl", label: "Sol ön çamurluk", x: "18%", y: "62%" },
-        { id: "fr", label: "Sağ ön çamurluk", x: "72%", y: "62%" },
-        { id: "mirror", label: "Dikiz aynası", x: "12%", y: "40%" },
-        { id: "bumper", label: "Ön tampon", x: "45%", y: "78%" },
-      ];
-      const z = zones[Math.floor(Math.random() * zones.length)];
-      setDamages((d) => (d.find((x) => x.id === z.id) ? d : [...d, z]));
-      triggerRoadEvent(exp.id);
-    }
-  }, [speed, exp, triggerRoadEvent]);
-
   if (!exp || exp.status !== "departed") return null;
 
-  const dest = exp.destination.split(" ")[0];
   const origin = exp.origin.split(" ")[0];
+  const dest = exp.destination.split(" ")[0];
+  const shift = lane * 50;
 
-  // Perspektif yardımcı
-  const depthY = (z: number) => 30 + (z / 100) * 48;
-  const depthS = (z: number) => 0.12 + Math.pow(z / 100, 1.3) * 1.5;
-  const depthX = (lane: number, z: number) =>
-    lane * (20 + (z / 100) * 90) + x * -40;
+  const proj = (z: number, lat: number) => {
+    const t = Math.max(0, Math.min(1, z / 100));
+    const scale = 0.12 + t * t * 1.75;
+    const y = 30 + t * 48;
+    const x = lat * (16 + t * 105) - shift * t;
+    return { scale, y, x, o: Math.min(1, z / 14) };
+  };
 
-  const worldTransform =
-    cam === "top"
-      ? `perspective(600px) rotateX(55deg) translateY(10%) scale(1.1)`
-      : cam === "hood"
-      ? `perspective(900px) rotateX(8deg) translateY(5%)`
-      : `perspective(1000px) rotateX(12deg)`;
+  const sky =
+    "linear-gradient(to bottom, #5b9bd5 0%, #87b8d8 40%, #c9b896 70%, #8a9a6a 100%)";
 
   return (
-    <div className="fixed inset-0 z-40 overflow-hidden select-none bg-slate-900">
-      {/* Gökyüzü */}
-      <div className="absolute inset-0 bg-gradient-to-b from-sky-700 via-sky-600 to-stone-500" />
-
-      {/* Harita / rota (sağ üst) */}
-      <div className="absolute top-3 right-3 z-50 w-40 bg-black/85 border border-zinc-600 rounded-lg p-2 text-[10px]">
-        <div className="text-zinc-500 mb-1">ROTA</div>
-        <div className="text-amber-400 font-mono leading-tight">
-          {origin}
-          <br />↓<br />
-          {dest}
-        </div>
-        <div className="mt-2 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+    <div className="fixed inset-0 z-40 overflow-hidden select-none" style={{ background: sky }}>
+      {/* Uzak şehir silüeti */}
+      <div className="absolute inset-x-0 top-[18%] h-28 flex items-end justify-center gap-1 opacity-40 pointer-events-none">
+        {[40, 56, 48, 64, 44, 52, 36, 60].map((h, i) => (
           <div
-            className="h-full bg-emerald-500 transition-all duration-300"
-            style={{ width: `${progress * 100}%` }}
+            key={i}
+            className="bg-[#4a5560] w-8 md:w-10"
+            style={{ height: h }}
           />
-        </div>
-        <div className="text-zinc-400 mt-1">{Math.round(kmLeft)} km · C kamera</div>
+        ))}
       </div>
 
       {/* Dünya */}
       <div
-        className="absolute inset-0 transition-transform duration-200"
+        className="absolute inset-0"
         style={{
-          transform: `${worldTransform} translateX(${-x * 50}px) rotateZ(${tilt * 0.5}deg)`,
+          transform:
+            cam === "top"
+              ? "perspective(480px) rotateX(58deg) translateY(15%)"
+              : cam === "hood"
+              ? "perspective(820px) rotateX(5deg)"
+              : "perspective(920px) rotateX(10deg)",
           transformOrigin: "50% 100%",
         }}
       >
-        {/* Yol — yamuk perspektif */}
+        {/* Yol */}
         <div
-          className="absolute left-0 right-0"
+          className="absolute left-1/2 -translate-x-1/2"
           style={{
             top: "28%",
-            bottom: cam === "cockpit" ? "28%" : "10%",
-            background: "linear-gradient(to bottom, #57534e, #1c1917)",
-            clipPath: "polygon(47% 0%, 53% 0%, 100% 100%, 0% 100%)",
+            width: "150%",
+            height: "58%",
+            background: "linear-gradient(to bottom, #7a7a7a, #333)",
+            clipPath: "polygon(43% 0%, 57% 0%, 100% 100%, 0% 100%)",
+            transform: `translateX(${-shift * 0.25}px) rotateZ(${steer * 0.12}deg)`,
+            boxShadow: "inset 0 0 40px rgba(0,0,0,0.3)",
           }}
         />
-        {/* Şerit çizgileri */}
-        {Array.from({ length: 12 }).map((_, i) => {
-          const z = ((i * 9 + (Date.now() / 40) * (speed / 40)) % 100);
-          const y = depthY(z);
-          const s = depthS(z);
+        {/* Kenar çizgileri hissi */}
+        <div
+          className="absolute left-1/2 bg-white/80"
+          style={{
+            top: "28%",
+            width: 2,
+            height: "55%",
+            transform: `translateX(calc(-50% - 22% + ${-shift * 0.2}px)) skewX(18deg)`,
+            transformOrigin: "top",
+            opacity: 0.5,
+          }}
+        />
+        <div
+          className="absolute left-1/2 bg-white/80"
+          style={{
+            top: "28%",
+            width: 2,
+            height: "55%",
+            transform: `translateX(calc(-50% + 22% + ${-shift * 0.2}px)) skewX(-18deg)`,
+            transformOrigin: "top",
+            opacity: 0.5,
+          }}
+        />
+
+        {/* Şerit */}
+        {Array.from({ length: 11 }).map((_, i) => {
+          const z = (i * 9 + dash) % 100;
+          const { scale, y, o } = proj(z, 0);
           return (
             <div
               key={i}
-              className="absolute left-1/2 bg-amber-400/90"
+              className="absolute left-1/2 bg-yellow-400"
               style={{
                 top: `${y}%`,
-                width: 3 * s,
-                height: 10 * s,
-                transform: "translateX(-50%)",
-                opacity: 0.3 + z / 100,
+                width: Math.max(3, 5 * scale),
+                height: Math.max(5, 14 * scale),
+                transform: `translateX(calc(-50% + ${-shift * (z / 100)}px))`,
+                opacity: o,
+                borderRadius: 1,
               }}
             />
           );
         })}
 
-        {/* Props */}
-        {props.map((p) => {
-          const z = p.z;
-          const y = depthY(z);
-          const s = depthS(z);
-          const px =
-            (p.side === "left" ? -1 : 1) * (55 + z * 0.9) + depthX(0, z) * 0.1;
-          const left = `calc(50% + ${px}px)`;
+        {/* Scenery */}
+        {scene.map((s) => {
+          const { scale, y, x, o } = proj(s.z, s.side * 1.4);
+          const left = `calc(50% + ${x}px)`;
+          const base = {
+            left,
+            top: `${y}%`,
+            transform: "translate(-50%, -85%)",
+            opacity: o,
+            zIndex: Math.floor(s.z),
+          } as const;
 
-          if (p.kind === "barrier" || wrongWay) {
-            if (p.kind === "barrier") {
-              return (
+          if (s.kind === "tree") {
+            return (
+              <div key={s.id} className="absolute" style={base}>
                 <div
-                  key={p.id}
-                  className="absolute font-black text-red-500 bg-yellow-400 border-2 border-black px-1"
+                  className="mx-auto bg-[#4a3728]"
+                  style={{ width: 4 * scale, height: 16 * scale }}
+                />
+                <div
+                  className="rounded-full bg-[#2d5a27]"
                   style={{
-                    left,
-                    top: `${y}%`,
-                    fontSize: Math.max(8, 14 * s),
-                    transform: "translateX(-50%)",
-                    zIndex: Math.floor(z),
+                    width: 24 * scale,
+                    height: 22 * scale,
+                    marginLeft: -10 * scale,
+                    marginTop: -5 * scale,
+                    border: "1px solid #1a3318",
+                  }}
+                />
+              </div>
+            );
+          }
+          if (s.kind === "house") {
+            return (
+              <div key={s.id} className="absolute" style={base}>
+                <div
+                  style={{
+                    width: 38 * scale,
+                    height: 30 * scale,
+                    background: "#a0522d",
+                    border: "1px solid #5c2e0b",
+                    boxShadow: `${4 * scale}px ${4 * scale}px 0 rgba(0,0,0,0.25)`,
                   }}
                 >
-                  DUR
+                  <div
+                    style={{
+                      position: "absolute",
+                      width: 9 * scale,
+                      height: 9 * scale,
+                      left: 5 * scale,
+                      top: 7 * scale,
+                      background: "#7dd3fc99",
+                    }}
+                  />
+                  <div
+                    style={{
+                      position: "absolute",
+                      width: 9 * scale,
+                      height: 9 * scale,
+                      right: 5 * scale,
+                      top: 7 * scale,
+                      background: "#7dd3fc99",
+                    }}
+                  />
                 </div>
-              );
-            }
-          }
-
-          if (p.kind === "house") {
-            return (
-              <div
-                key={p.id}
-                className="absolute"
-                style={{
-                  left,
-                  top: `${y - 4}%`,
-                  transform: "translateX(-50%)",
-                  zIndex: Math.floor(z),
-                  opacity: Math.min(1, z / 15),
-                }}
-              >
                 <div
                   style={{
-                    width: 36 * s,
-                    height: 28 * s,
-                    background: "#7f1d1d",
-                    border: "1px solid #450a0a",
-                    boxShadow: `${4 * s}px ${4 * s}px 0 rgba(0,0,0,0.3)`,
-                  }}
-                />
-                <div
-                  style={{
-                    width: 40 * s,
-                    height: 8 * s,
-                    marginLeft: -2 * s,
-                    background: "#44403c",
+                    width: 44 * scale,
+                    height: 9 * scale,
+                    marginLeft: -3 * scale,
+                    background: "#3f3f46",
                   }}
                 />
               </div>
             );
           }
-
-          if (p.kind === "tree") {
+          if (s.kind === "apartment") {
             return (
-              <div
-                key={p.id}
-                className="absolute"
-                style={{
-                  left,
-                  top: `${y}%`,
-                  transform: "translateX(-50%)",
-                  zIndex: Math.floor(z),
-                }}
-              >
+              <div key={s.id} className="absolute" style={base}>
                 <div
                   style={{
-                    width: 4 * s,
-                    height: 16 * s,
-                    background: "#3d2914",
-                    margin: "0 auto",
+                    width: 34 * scale,
+                    height: 48 * scale,
+                    background: "#94a3b8",
+                    border: "1px solid #64748b",
+                    boxShadow: `${4 * scale}px ${4 * scale}px 0 rgba(0,0,0,0.2)`,
                   }}
-                />
-                <div
-                  className="rounded-full"
-                  style={{
-                    width: 22 * s,
-                    height: 20 * s,
-                    marginLeft: -9 * s,
-                    marginTop: -4,
-                    background: "#166534",
-                  }}
-                />
+                >
+                  {[0, 1, 2].map((r) => (
+                    <div key={r} className="flex gap-[2px] justify-center mt-1">
+                      <div
+                        style={{
+                          width: 6 * scale,
+                          height: 5 * scale,
+                          background: "#fde68a66",
+                        }}
+                      />
+                      <div
+                        style={{
+                          width: 6 * scale,
+                          height: 5 * scale,
+                          background: "#fde68a66",
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
             );
           }
-
-          if (p.kind === "trash") {
+          if (s.kind === "station") {
+            return (
+              <div key={s.id} className="absolute" style={base}>
+                <div
+                  style={{
+                    width: 70 * scale,
+                    height: 28 * scale,
+                    background: "#dc2626",
+                    border: "2px solid #fff",
+                    position: "relative",
+                  }}
+                >
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: -10 * scale,
+                      left: 4 * scale,
+                      right: 4 * scale,
+                      height: 12 * scale,
+                      background: "#e5e5e5",
+                      borderRadius: 2,
+                    }}
+                  />
+                  <div
+                    className="text-white font-black text-center"
+                    style={{ fontSize: Math.max(5, 8 * scale), marginTop: 8 * scale }}
+                  >
+                    POMPA
+                  </div>
+                </div>
+                <div
+                  className="bg-yellow-400 text-black font-bold text-center border border-black"
+                  style={{ fontSize: Math.max(5, 7 * scale) }}
+                >
+                  BENZİNLİK
+                </div>
+              </div>
+            );
+          }
+          if (s.kind === "shop") {
+            return (
+              <div key={s.id} className="absolute" style={base}>
+                <div
+                  style={{
+                    width: 32 * scale,
+                    height: 20 * scale,
+                    background: "#b45309",
+                  }}
+                />
+                <div
+                  className="bg-red-700 text-white text-center"
+                  style={{ fontSize: Math.max(5, 7 * scale) }}
+                >
+                  Büfe
+                </div>
+              </div>
+            );
+          }
+          if (s.kind === "fence") {
             return (
               <div
-                key={p.id}
-                className="absolute bg-zinc-600 border border-zinc-800"
+                key={s.id}
+                className="absolute bg-zinc-500"
                 style={{
-                  left,
-                  top: `${y + 5}%`,
-                  width: 10 * s,
-                  height: 12 * s,
-                  transform: "translateX(-50%)",
-                  zIndex: Math.floor(z),
+                  ...base,
+                  width: 28 * scale,
+                  height: 4 * scale,
+                  transform: "translate(-50%, 0)",
                 }}
               />
             );
           }
-
-          if (p.kind === "simit") {
-            return (
-              <div
-                key={p.id}
-                className="absolute text-center"
-                style={{
-                  left,
-                  top: `${y}%`,
-                  transform: "translateX(-50%)",
-                  zIndex: Math.floor(z),
-                  fontSize: Math.max(7, 11 * s),
-                }}
-              >
-                <div className="bg-amber-800 text-amber-100 px-1 rounded-sm whitespace-nowrap">
-                  Simit!
-                </div>
-              </div>
-            );
-          }
-
-          if (p.kind === "billboard" || p.kind === "sign") {
-            return (
-              <div
-                key={p.id}
-                className="absolute bg-red-800 border-2 border-white text-white text-center font-bold"
-                style={{
-                  left,
-                  top: `${y}%`,
-                  transform: "translateX(-50%)",
-                  width: 50 * s,
-                  fontSize: Math.max(5, 8 * s),
-                  padding: 2,
-                  zIndex: Math.floor(z),
-                }}
-              >
-                {p.kind === "sign" ? "90" : "NEXORA"}
-              </div>
-            );
-          }
-
-          return null;
-        })}
-
-        {/* Yayalar */}
-        {pedestrians.map((p) => (
-          <div
-            key={p.id}
-            className="absolute"
-            style={{
-              left: `calc(50% + ${p.x + depthX(0, p.z)}px)`,
-              top: `${depthY(p.z)}%`,
-              transform: "translateX(-50%)",
-              zIndex: Math.floor(p.z + 5),
-            }}
-          >
-            <div
-              className="bg-stone-800"
-              style={{
-                width: 6 * depthS(p.z),
-                height: 14 * depthS(p.z),
-                borderRadius: 2,
-              }}
-            />
-          </div>
-        ))}
-
-        {/* Trafik */}
-        {traffic.map((t) => {
-          const s = depthS(t.z);
-          const y = depthY(t.z);
-          const px = depthX(t.lane, t.z);
           return (
             <div
-              key={t.id}
+              key={s.id}
+              className="absolute bg-zinc-500"
+              style={{
+                left,
+                top: `${y}%`,
+                width: 3 * scale,
+                height: 34 * scale,
+                transform: "translate(-50%, -100%)",
+                opacity: o,
+                zIndex: Math.floor(s.z),
+              }}
+            />
+          );
+        })}
+
+        {/* Trafik */}
+        {ents.map((e) => {
+          const { scale, y, x, o } = proj(e.z, e.lane);
+          const w =
+            (e.kind === "truck" ? 40 : e.kind === "bus" ? 36 : 26) * scale;
+          const h =
+            (e.kind === "truck" ? 52 : e.kind === "bus" ? 48 : 34) * scale;
+          return (
+            <div
+              key={e.id}
               className="absolute"
               style={{
-                left: `calc(50% + ${px}px)`,
+                left: `calc(50% + ${x}px)`,
                 top: `${y}%`,
-                transform: "translateX(-50%)",
-                zIndex: Math.floor(t.z + 10),
-                opacity: Math.min(1, t.z / 12),
+                transform: "translate(-50%, -40%)",
+                opacity: o,
+                zIndex: Math.floor(e.z + 25),
               }}
             >
               <div
                 style={{
-                  width: (t.kind === "truck" ? 36 : 26) * s,
-                  height: (t.kind === "truck" ? 50 : 34) * s,
-                  background: t.color,
-                  border: "1px solid #000",
-                  boxShadow: "2px 3px 0 rgba(0,0,0,0.35)",
+                  width: w,
+                  height: h,
+                  background: e.color,
+                  border: "1px solid #111",
+                  borderRadius: 2,
+                  boxShadow: "3px 4px 0 rgba(0,0,0,0.3)",
                   position: "relative",
                 }}
               >
@@ -578,14 +517,31 @@ export default function DrivingView({ expeditionId }: DrivingViewProps) {
                     left: "10%",
                     right: "10%",
                     height: "28%",
-                    background: "#0c4a6e",
+                    background: "linear-gradient(#93c5fd,#1e40af)",
                   }}
                 />
-                {t.kind === "police" && (
-                  <div className="absolute top-0 left-0 right-0 h-[8%] bg-red-600" />
-                )}
-                {t.kind === "ambulance" && (
-                  <div className="absolute top-0 left-0 right-0 h-[8%] bg-red-500" />
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: "10%",
+                    left: "10%",
+                    width: "16%",
+                    height: "12%",
+                    background: "#fde68a",
+                  }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: "10%",
+                    right: "10%",
+                    width: "16%",
+                    height: "12%",
+                    background: "#fde68a",
+                  }}
+                />
+                {e.kind === "police" && (
+                  <div className="absolute top-0 inset-x-0 h-[10%] bg-red-600" />
                 )}
               </div>
             </div>
@@ -593,118 +549,131 @@ export default function DrivingView({ expeditionId }: DrivingViewProps) {
         })}
       </div>
 
-      {/* Yanlış yol uyarısı */}
-      {wrongWay && (
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white font-black px-6 py-2 border-4 border-yellow-400 animate-pulse">
-          YANLIŞ YÖN — ŞERİDE DÖN
-        </div>
-      )}
-
-      {/* Tabela */}
       {showSign && (
-        <div className="absolute top-[18%] left-1/2 -translate-x-1/2 z-40 bg-yellow-400 text-black border-4 border-black px-4 py-2 font-black text-sm shadow-xl">
-          {signText}
+        <div className="absolute top-[14%] left-1/2 -translate-x-1/2 z-30 px-3 py-1 bg-yellow-400 text-black border-[3px] border-black font-black text-[11px] md:text-sm shadow-xl whitespace-nowrap">
+          {sign}
         </div>
       )}
 
-      {/* Hasar işaretleri */}
-      {damages.map((d) => (
-        <div
-          key={d.id}
-          className="absolute z-45 pointer-events-none"
-          style={{ left: d.x, top: d.y }}
-        >
-          <div className="text-red-500 font-black text-xs bg-black/60 px-1 rounded">
-            ✦ {d.label}
-          </div>
+      {atStation && (
+        <div className="absolute top-[42%] left-1/2 -translate-x-1/2 z-50 bg-black/85 border-2 border-amber-500 px-4 py-2 rounded-lg text-center">
+          <div className="text-amber-400 font-bold text-sm">BENZİNLİK</div>
+          <div className="text-zinc-300 text-xs">F tuşu — dolum +%25</div>
         </div>
-      ))}
+      )}
 
-      {/* Dikiz aynaları (kokpitte) */}
+      {/* Aynalar */}
       {cam === "cockpit" && (
         <>
-          <div className="absolute top-16 left-6 z-40 w-24 h-14 rounded border-2 border-zinc-500 bg-sky-900/40 overflow-hidden shadow-lg">
-            <div className="text-[8px] text-zinc-400 text-center">SOL AYNА</div>
-            <div className="h-full bg-gradient-to-b from-stone-600 to-stone-800 opacity-80" />
-          </div>
-          <div className="absolute top-16 right-6 z-40 w-24 h-14 rounded border-2 border-zinc-500 bg-sky-900/40 overflow-hidden shadow-lg">
-            <div className="text-[8px] text-zinc-400 text-center">SAĞ AYNA</div>
-            <div className="h-full bg-gradient-to-b from-stone-600 to-stone-800 opacity-80" />
-          </div>
-          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-40 w-28 h-12 rounded border-2 border-zinc-600 bg-zinc-900/90 overflow-hidden">
-            <div className="text-[8px] text-zinc-500 text-center">ORTA DİKİZ</div>
-            <div className="h-full bg-stone-700/50" />
+          {(["left", "right"] as const).map((side) => (
+            <div
+              key={side}
+              className={`absolute top-12 z-40 w-28 h-[4.5rem] rounded-md border-2 border-zinc-400 overflow-hidden shadow-xl ${
+                side === "left" ? "left-3" : "right-3"
+              }`}
+              style={{
+                background: "linear-gradient(to bottom, #6d8f6a, #3d4f3a)",
+              }}
+            >
+              <div className="text-[7px] text-center text-white/80 bg-black/50">
+                {side === "left" ? "SOL AYNA" : "SAĞ AYNA"}
+              </div>
+              <div
+                className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[45%] h-[65%] bg-zinc-600"
+                style={{
+                  clipPath: "polygon(28% 0%, 72% 0%, 100% 100%, 0% 100%)",
+                }}
+              />
+              {ents[0] && (
+                <div
+                  className="absolute w-4 h-5 border border-black/50 rounded-sm"
+                  style={{
+                    background: ents[0].color,
+                    bottom: 8,
+                    [side === "left" ? "left" : "right"]: 10,
+                  }}
+                />
+              )}
+            </div>
+          ))}
+          <div className="absolute top-10 left-1/2 -translate-x-1/2 z-40 w-36 h-14 rounded border-2 border-zinc-500 bg-zinc-800 overflow-hidden">
+            <div className="text-[7px] text-center text-zinc-500">ORTA DİKİZ</div>
+            <div className="h-full bg-gradient-to-b from-zinc-600 to-zinc-900 flex items-end justify-center pb-1 gap-1">
+              <div className="w-6 h-2.5 bg-zinc-500 rounded-sm" />
+              <div className="w-4 h-3 bg-zinc-400 rounded-sm opacity-70" />
+            </div>
           </div>
         </>
       )}
 
-      {/* Kokpit — BMC esintili */}
+      {/* Kokpit BMC */}
       {cam !== "top" && (
-        <div className="absolute bottom-0 inset-x-0 z-40 pointer-events-none"
-          style={{ height: cam === "hood" ? "22%" : "36%" }}
+        <div
+          className="absolute bottom-0 inset-x-0 z-40 pointer-events-none"
+          style={{ height: cam === "hood" ? "18%" : "40%" }}
         >
-          <div className="absolute inset-0 bg-gradient-to-t from-[#1a1a1d] via-[#252528ee] to-transparent" />
           {cam === "cockpit" && (
             <>
-              <div className="absolute bottom-0 inset-x-0 h-[70%] bg-[#2a2a2e] border-t border-zinc-600">
-                {/* Torpido düğmeler */}
-                <div className="absolute top-3 left-6 grid grid-cols-4 gap-1">
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <div key={i} className="w-4 h-3 rounded-sm bg-zinc-600 border border-zinc-500" />
-                  ))}
-                </div>
-                <div className="absolute top-3 right-6 grid grid-cols-3 gap-1">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className={`w-3 h-3 rounded-full ${
-                        i < 2 ? "bg-red-500" : "bg-zinc-600"
-                      }`}
-                    />
-                  ))}
-                </div>
-                {/* Kadran */}
-                <div className="absolute top-2 left-1/2 -translate-x-1/2 w-28 h-16 rounded bg-zinc-900 border border-zinc-600 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="text-2xl font-mono text-amber-400">
-                      {Math.round(speed)}
-                    </div>
-                    <div className="text-[8px] text-zinc-500">km/s</div>
-                  </div>
-                </div>
-                {/* Direksiyon */}
-                <div
-                  className="absolute bottom-4 left-1/2 -translate-x-1/2 w-36 h-36 rounded-full border-[12px] border-zinc-500 bg-zinc-800"
-                  style={{ transform: `rotate(${tilt * 6}deg)` }}
-                >
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-zinc-900 border-2 border-blue-600 flex items-center justify-center">
-                    <span className="text-[8px] font-black text-blue-400">OT</span>
-                  </div>
-                </div>
-                {/* Sarı tutamak */}
-                <div className="absolute right-8 top-8 w-2 h-20 bg-yellow-500 rounded-full opacity-90" />
+              <div
+                className="absolute bottom-0 inset-x-0 h-[88%]"
+                style={{
+                  background: "linear-gradient(to top, #1a1a1d 0%, #3d3d44 100%)",
+                  clipPath:
+                    "polygon(0 30%, 6% 0, 94% 0, 100% 30%, 100% 100%, 0 100%)",
+                  borderTop: "2px solid #666",
+                }}
+              />
+              <div className="absolute bottom-[55%] left-[7%] grid grid-cols-4 gap-1">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="w-5 h-3 rounded-sm bg-zinc-600 border border-zinc-500"
+                  />
+                ))}
               </div>
-              {/* Yakıt */}
-              <div className="absolute bottom-28 left-4 bg-black/90 border border-zinc-600 rounded px-2 py-1 text-[10px]">
-                <span className="text-zinc-500">MAZOT </span>
+              <div className="absolute bottom-[55%] right-[7%] flex gap-1.5">
+                <div className="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]" />
+                <div className="w-3 h-3 rounded-full bg-red-700" />
+                <div className="w-3 h-3 rounded-full bg-zinc-600" />
+              </div>
+              <div className="absolute bottom-[50%] left-1/2 -translate-x-1/2 w-28 h-22 flex flex-col items-center">
+                <div className="w-24 h-16 rounded-full bg-zinc-950 border-4 border-zinc-600 flex flex-col items-center justify-center shadow-inner">
+                  <span className="text-3xl font-mono text-amber-400 leading-none">
+                    {Math.round(speed)}
+                  </span>
+                  <span className="text-[8px] text-zinc-500">km/s</span>
+                </div>
+              </div>
+              <div
+                className="absolute bottom-2 left-1/2 -translate-x-1/2 w-[10.5rem] h-[10.5rem] rounded-full border-[13px] border-zinc-500 bg-zinc-800"
+                style={{ transform: `rotate(${steer}deg)` }}
+              >
+                <div className="absolute inset-3 rounded-full border border-zinc-600" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-full bg-zinc-900 border-2 border-blue-500 flex items-center justify-center">
+                  <span className="text-[10px] font-black text-blue-400">BMC</span>
+                </div>
+              </div>
+              <div className="absolute right-8 bottom-[42%] w-2.5 h-28 bg-yellow-400 rounded-full shadow-lg" />
+              <div className="absolute bottom-6 left-5 bg-black/90 border border-zinc-600 rounded px-2 py-1 text-[10px]">
+                MAZOT{" "}
                 <span className={fuel < 20 ? "text-red-400" : "text-emerald-400"}>
                   %{Math.round(fuel)}
                 </span>
               </div>
-              <div className="absolute bottom-28 right-4 flex gap-2">
+              <div className="absolute bottom-6 right-5 flex gap-2">
                 <div
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-[10px] ${
+                  className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs ${
                     signal === "left"
-                      ? "bg-amber-400 border-amber-200 animate-pulse"
+                      ? "bg-amber-400 border-amber-200 text-black"
                       : "bg-zinc-800 border-zinc-600 text-zinc-600"
                   }`}
                 >
                   ◀
                 </div>
                 <div
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-[10px] ${
+                  className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs ${
                     signal === "right"
-                      ? "bg-amber-400 border-amber-200 animate-pulse"
+                      ? "bg-amber-400 border-amber-200 text-black"
                       : "bg-zinc-800 border-zinc-600 text-zinc-600"
                   }`}
                 >
@@ -716,10 +685,18 @@ export default function DrivingView({ expeditionId }: DrivingViewProps) {
         </div>
       )}
 
-      {/* Üst bilgi */}
-      <div className="absolute top-3 left-3 z-50 text-[10px] text-zinc-300 bg-black/70 px-2 py-1 rounded border border-zinc-700">
-        WASD · C kamera · Q/E sinyal · Space silecek
-        {wiper && " · SİLECEK AÇIK"}
+      <div className="absolute top-2 left-2 z-50 text-[9px] text-white bg-black/75 px-2 py-1 rounded">
+        WASD · C kamera · Q/E · Space · F istasyon
+      </div>
+      <div className="absolute top-2 right-2 z-50 w-36 bg-black/85 border border-zinc-600 rounded-lg p-2 text-[10px]">
+        <div className="text-zinc-500">ROTA</div>
+        <div className="text-amber-400 font-mono">
+          {origin} → {dest}
+        </div>
+        <div className="mt-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+          <div className="h-full bg-emerald-500" style={{ width: `${prog * 100}%` }} />
+        </div>
+        <div className="text-zinc-400 mt-0.5">{Math.round(km)} km</div>
       </div>
     </div>
   );
