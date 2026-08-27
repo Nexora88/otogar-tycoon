@@ -1,7 +1,7 @@
 "use client";
 
 import { useGameStore } from "@/store/gameStore";
-import { Phone, X } } from "lucide-react";
+import { Phone, X } from "lucide-react";
 
 export default function PhoneUI() {
   const phoneOpen = useGameStore((s) => s.phoneOpen);
@@ -23,7 +23,7 @@ export default function PhoneUI() {
       >
         <Phone className="w-5 h-5 text-amber-400" />
         {unread > 0 && (
-          <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-600 text-[10px] flex items-center justify-center font-bold">
+          <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-600 text-[10px] flex items-center justify-center font-bold text-white">
             {unread}
           </span>
         )}
@@ -32,7 +32,6 @@ export default function PhoneUI() {
       {phoneOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-4">
           <div className="w-full max-w-[280px] rounded-[1.5rem] border-4 border-zinc-700 bg-zinc-900 shadow-2xl overflow-hidden">
-            {/* Atatürk duvar kâğıdı hissi */}
             <div className="h-28 bg-gradient-to-b from-stone-700 to-stone-900 flex flex-col items-center justify-center border-b border-zinc-600 relative">
               <div className="w-14 h-14 rounded-full bg-stone-600 border-2 border-amber-700/50 flex items-center justify-center text-xl font-serif text-stone-300">
                 A
@@ -50,7 +49,9 @@ export default function PhoneUI() {
             </div>
             <div className="max-h-64 overflow-y-auto p-2 space-y-2">
               {messages.length === 0 && (
-                <p className="text-xs text-zinc-600 p-3 text-center">Mesaj yok</p>
+                <p className="text-xs text-zinc-600 p-3 text-center">
+                  Mesaj yok
+                </p>
               )}
               {messages.map((m) => (
                 <div
