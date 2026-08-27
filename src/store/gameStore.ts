@@ -14,6 +14,7 @@ export interface GameBus {
   name: string;
   fuelUse: number;
   muavinCost: number;
+  plate: string;
 }
 
 export interface Passenger {
@@ -46,6 +47,7 @@ export interface Expedition {
   passengers: Passenger[];
   createdAt: number;
   currentEvent?: RoadEvent | null;
+  driveMode?: "self" | "driver";
 }
 
 export interface CustomerCase {
@@ -76,7 +78,7 @@ export const SLOT_INFO: Record<
     cps: 0.85,
     repMod: 0,
     risk: 0,
-    desc: "Bozuk paran yoksa turnikeden geçemezsin. Küçük ama bitmeyen nakit.",
+    desc: "Bozuk paran yoksa turnikeden geçemezsin.",
   },
   bufe: {
     label: "Peron Büfesi",
@@ -84,7 +86,7 @@ export const SLOT_INFO: Record<
     cps: 2.6,
     repMod: -1,
     risk: 6,
-    desc: "Bayat tost & sıcak ayran. İtibar hafif sarsılır, kasa sever.",
+    desc: "Bayat tost & sıcak ayran.",
   },
   emanet: {
     label: "Emanetçi",
@@ -92,7 +94,7 @@ export const SLOT_INFO: Record<
     cps: 4.4,
     repMod: 1,
     risk: 20,
-    desc: "Bırak çantanı kaptan. Yüksek kâr, zabıta riski.",
+    desc: "Yüksek kâr, zabıta riski.",
   },
   cayci: {
     label: "Çay Ocağı",
@@ -100,7 +102,7 @@ export const SLOT_INFO: Record<
     cps: 1.7,
     repMod: 1,
     risk: 2,
-    desc: "İnce belli bardak, uzun sohbet.",
+    desc: "İnce belli bardak.",
   },
   bilet: {
     label: "Bilet Gişesi",
@@ -108,7 +110,7 @@ export const SLOT_INFO: Record<
     cps: 2.1,
     repMod: 2,
     risk: 0,
-    desc: "Resmî gişe — güven ve düzen.",
+    desc: "Resmî gişe.",
   },
   mescit: {
     label: "Mescit",
@@ -124,7 +126,7 @@ export const SLOT_INFO: Record<
     cps: 1.9,
     repMod: 0,
     risk: 5,
-    desc: "Dolmuş ve özel araçlar için.",
+    desc: "Araç parkı.",
   },
 };
 
@@ -179,6 +181,7 @@ export interface GameState {
   addMoney: (amount: number) => void;
   spendMoney: (amount: number) => boolean;
   paintBus: (busId: string, color: BusColor) => void;
+  setBusPlate: (busId: string, plate: string) => void;
   buyBus: (listing: BusListing) => boolean;
   addExpedition: (exp: Expedition) => void;
   updateExpedition: (id: string, data: Partial<Expedition>) => void;
@@ -194,7 +197,7 @@ export interface GameState {
   rentDesk: () => boolean;
   spawnCustomer: () => void;
   resolveCustomer: (choice: "dismiss" | "help" | "compensate") => void;
-  takeBankLoan: (amount: number) => void;
+  takeBankLoan: (amount: number) => boolean;
   payBankDebt: (amount: number) => boolean;
   payTax: () => boolean;
   accrueTax: (profit: number) => void;
@@ -215,9 +218,10 @@ const startingBus: GameBus = {
   name: "Emektar",
   fuelUse: 32,
   muavinCost: 400,
+  plate: "34 TYC 01",
 };
 
-const randomNames = [
+const NAMES = [
   "Ahmet Yılmaz", "Ayşe Demir", "Mehmet Kaya", "Fatma Çelik", "Mustafa Şahin",
   "Elif Arslan", "Hüseyin Koç", "Zeynep Aydın", "İbrahim Öz", "Merve Yıldız",
 ];
@@ -225,18 +229,18 @@ const randomNames = [
 export function generatePassengers(count: number): Passenger[] {
   return Array.from({ length: count }).map((_, i) => ({
     id: `p-${Date.now()}-${i}`,
-    name: randomNames[Math.floor(Math.random() * randomNames.length)],
+    name: NAMES[Math.floor(Math.random() * NAMES.length)],
     mood: Math.random() > 0.8 ? "angry" : Math.random() > 0.4 ? "normal" : "happy",
   }));
 }
 
 const ROAD_EVENTS: Omit<RoadEvent, "id">[] = [
   { type: "eds", title: "EDS Flaş!", description: "Hız cezası.", moneyChange: -1850, reputationChange: -1, emoji: "📸" },
-  { type: "police", title: "Çevirme", description: "Kontrol noktası.", moneyChange: 0, reputationChange: 0, emoji: "🚓" },
-  { type: "accident", title: "Kaza", description: "Hasar masrafı.", moneyChange: -9000, reputationChange: -3, emoji: "💥" },
-  { type: "lawsuit", title: "Dava", description: "Tazminat dosyası.", moneyChange: -15000, reputationChange: -5, emoji: "⚖️" },
-  { type: "fight", title: "Kavga", description: "Yol kenarı olay.", moneyChange: 0, reputationChange: 1, emoji: "🥊" },
-  { type: "funny", title: "Anons", description: "Mikrofon açık kaldı.", moneyChange: 0, reputationChange: -2, emoji: "🎙️" },
+  { type: "police", title: "Çevirme", description: "Kontrol.", moneyChange: 0, reputationChange: 0, emoji: "🚓" },
+  { type: "accident", title: "Kaza", description: "Hasar.", moneyChange: -9000, reputationChange: -3, emoji: "💥" },
+  { type: "lawsuit", title: "Dava", description: "Tazminat.", moneyChange: -15000, reputationChange: -5, emoji: "⚖️" },
+  { type: "fight", title: "Kavga", description: "Yol kenarı.", moneyChange: 0, reputationChange: 1, emoji: "🥊" },
+  { type: "funny", title: "Anons", description: "Mikrofon açık.", moneyChange: 0, reputationChange: -2, emoji: "🎙️" },
   { type: "weather", title: "Sağanak", description: "Tempo düştü.", moneyChange: 0, reputationChange: 0, emoji: "🌧️" },
 ];
 
@@ -249,6 +253,8 @@ const CUSTOMERS: Omit<CustomerCase, "id">[] = [
 ];
 
 const emptySlots = (): TerminalSlot[] => Array.from({ length: 6 }).map(() => "empty");
+
+const MAX_LOAN = 50000;
 
 export const useGameStore = create<GameState>()(
   persist(
@@ -284,7 +290,7 @@ export const useGameStore = create<GameState>()(
           companyName: "Misafir Şirket",
           balance: 75000,
           reputation: 45,
-          buses: [startingBus],
+          buses: [{ ...startingBus }],
           expeditions: [],
           hasPlayedOnce: false,
           complaints: [],
@@ -313,12 +319,21 @@ export const useGameStore = create<GameState>()(
         set((s) => ({ balance: s.balance - a }));
         return true;
       },
+
       paintBus: (id, color) =>
-        set((s) => ({ buses: s.buses.map((b) => (b.id === id ? { ...b, color } : b)) })),
+        set((s) => ({
+          buses: s.buses.map((b) => (b.id === id ? { ...b, color } : b)),
+        })),
+
+      setBusPlate: (busId, plate) =>
+        set((s) => ({
+          buses: s.buses.map((b) =>
+            b.id === busId ? { ...b, plate: plate.toUpperCase().slice(0, 14) } : b
+          ),
+        })),
 
       buyBus: (listing) => {
-        const { balance } = get();
-        if (balance < listing.price) return false;
+        if (get().balance < listing.price) return false;
         const bus: GameBus = {
           id: `bus-${Date.now()}`,
           model: listing.model,
@@ -328,6 +343,7 @@ export const useGameStore = create<GameState>()(
           color: listing.color,
           fuelUse: listing.fuelUse,
           muavinCost: listing.muavinCost,
+          plate: `34 ${listing.model.slice(0, 3).toUpperCase()} ${10 + Math.floor(Math.random() * 89)}`,
         };
         set((s) => ({
           balance: s.balance - listing.price,
@@ -341,6 +357,7 @@ export const useGameStore = create<GameState>()(
         set((s) => ({
           expeditions: s.expeditions.map((e) => (e.id === id ? { ...e, ...data } : e)),
         })),
+
       openComplaint: (text) =>
         set((s) => ({
           currentComplaint: text,
@@ -389,9 +406,14 @@ export const useGameStore = create<GameState>()(
       rentDesk: () => {
         const { balance, deskRented, reputation } = get();
         if (deskRented || balance < 25000) return false;
-        set({ balance: balance - 25000, deskRented: true, reputation: Math.min(100, reputation + 3) });
+        set({
+          balance: balance - 25000,
+          deskRented: true,
+          reputation: Math.min(100, reputation + 3),
+        });
         return true;
       },
+
       spawnCustomer: () => {
         const c = CUSTOMERS[Math.floor(Math.random() * CUSTOMERS.length)];
         set({ pendingCustomer: { ...c, id: `c-${Date.now()}` } });
@@ -407,13 +429,28 @@ export const useGameStore = create<GameState>()(
             reputation: Math.min(100, reputation + 2 + customerServiceLevel),
           });
         } else {
-          const pay = pendingCustomer.type === "accident_claim" ? 12000 : 800 + customerServiceLevel * 300;
-          set({ pendingCustomer: null, balance: balance - pay, reputation: Math.min(100, reputation + 6) });
+          const pay =
+            pendingCustomer.type === "accident_claim"
+              ? 12000
+              : 800 + customerServiceLevel * 300;
+          set({
+            pendingCustomer: null,
+            balance: balance - pay,
+            reputation: Math.min(100, reputation + 6),
+          });
         }
       },
 
-      takeBankLoan: (amount) =>
-        set((s) => ({ balance: s.balance + amount, bankDebt: s.bankDebt + Math.round(amount * 1.15) })),
+      takeBankLoan: (amount) => {
+        const a = Math.min(MAX_LOAN, Math.max(0, Math.floor(amount)));
+        if (a < 1000) return false;
+        if (get().bankDebt + a > MAX_LOAN * 1.15) return false;
+        set((s) => ({
+          balance: s.balance + a,
+          bankDebt: s.bankDebt + Math.round(a * 1.12),
+        }));
+        return true;
+      },
       payBankDebt: (amount) => {
         const { balance, bankDebt } = get();
         const pay = Math.min(amount, bankDebt, balance);
@@ -424,7 +461,11 @@ export const useGameStore = create<GameState>()(
       payTax: () => {
         const { balance, taxDue, reputation } = get();
         if (taxDue <= 0 || balance < taxDue) return false;
-        set({ balance: balance - taxDue, taxDue: 0, reputation: Math.min(100, reputation + 2) });
+        set({
+          balance: balance - taxDue,
+          taxDue: 0,
+          reputation: Math.min(100, reputation + 2),
+        });
         return true;
       },
       accrueTax: (profit) => {
@@ -484,8 +525,7 @@ export const useGameStore = create<GameState>()(
 
       triggerSecurityRaid: () => {
         const { securityRisk, balance, reputation } = get();
-        if (securityRisk < 22) return;
-        if (Math.random() > securityRisk / 130) return;
+        if (securityRisk < 22 || Math.random() > securityRisk / 130) return;
         const fine = 2500 + Math.floor(securityRisk * 90);
         set({
           balance: balance - fine,
@@ -494,7 +534,7 @@ export const useGameStore = create<GameState>()(
             id: `raid-${Date.now()}`,
             type: "police",
             title: "Zabıta Baskını",
-            description: "Emanet / büfe denetimi. Usulsüzlük cezası.",
+            description: "Emanet / büfe denetimi.",
             moneyChange: -fine,
             reputationChange: -3,
             emoji: "🚨",
@@ -510,6 +550,6 @@ export const useGameStore = create<GameState>()(
         return final;
       },
     }),
-    { name: "otogar-tycoon-save" }
+    { name: "otogar-tycoon-save-v2" }
   )
 );

@@ -3,59 +3,106 @@
 import Link from "next/link";
 import { useGameStore } from "@/store/gameStore";
 import { formatMoney } from "@/lib/utils";
-import { Bus, Route, Warehouse, TrendingUp } from "lucide-react";
+import {
+  Route,
+  Warehouse,
+  Building2,
+  Landmark,
+  ShoppingBag,
+  Bus,
+} from "lucide-react";
 
 export default function DashboardPage() {
-  const { companyName, balance, reputation, buses, isGuest } = useGameStore();
+  const { companyName, balance, reputation, buses, expeditions, bankDebt, taxDue } =
+    useGameStore();
+
+  const active = expeditions.filter((e) => e.status !== "completed").length;
 
   return (
-    <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold">Hoş geldin, {companyName}</h1>
-        <p className="text-zinc-400 mt-1">
-          {isGuest
-            ? "Misafir olarak oynuyorsun. İlerledikçe kayıt olmanı önereceğiz."
-            : "Şirketinin genel durumu burada."}
-        </p>
+    <div className="p-6 md:p-8 max-w-5xl mx-auto">
+      <h1 className="text-2xl font-bold mb-1">{companyName}</h1>
+      <p className="text-zinc-400 text-sm mb-8">Panel — günlük özet</p>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+        <Card label="Kasa" value={formatMoney(balance)} accent />
+        <Card label="İtibar" value={`${reputation}/100`} />
+        <Card label="Filo" value={`${buses.length} araç`} />
+        <Card label="Aktif sefer" value={`${active}`} />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-        <StatCard title="Kasa" value={formatMoney(balance)} icon={<TrendingUp className="w-5 h-5 text-amber-400" />} />
-        <StatCard title="İtibar" value={`${reputation}/100`} icon={<TrendingUp className="w-5 h-5 text-green-400" />} />
-        <StatCard title="Filo" value={`${buses.length} Otobüs`} icon={<Bus className="w-5 h-5 text-blue-400" />} />
-        <StatCard title="Aktif Sefer" value="0" icon={<Route className="w-5 h-5 text-purple-400" />} />
-      </div>
+      {(bankDebt > 0 || taxDue > 0) && (
+        <div className="mb-6 text-sm text-zinc-400 flex flex-wrap gap-4">
+          {bankDebt > 0 && (
+            <span>
+              Borç: <span className="text-red-400">{formatMoney(bankDebt)}</span>
+            </span>
+          )}
+          {taxDue > 0 && (
+            <span>
+              Vergi: <span className="text-amber-500">{formatMoney(taxDue)}</span>
+            </span>
+          )}
+        </div>
+      )}
 
-      <h2 className="text-lg font-semibold mb-4">Hızlı İşlemler</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <QuickAction href="/garage" title="Garaja Git" description="Otobüslerini gör, boya, bakım yaptır" icon={<Warehouse className="w-6 h-6" />} />
-        <QuickAction href="/expeditions" title="Sefer Koy" description="Yeni sefer oluştur, yolcu topla" icon={<Route className="w-6 h-6" />} />
-        <QuickAction href="/market" title="Pazara Git" description="Yeni otobüs al veya sat" icon={<Bus className="w-6 h-6" />} />
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <Quick href="/expeditions" icon={Route} title="Seferler" desc="Yola çık" />
+        <Quick href="/garage" icon={Warehouse} title="Garaj" desc="Boya & plaka" />
+        <Quick href="/office" icon={Landmark} title="Ofis" desc="Muhasebe & banka" />
+        <Quick href="/terminal" icon={Building2} title="Terminalim" desc="İnşaat" />
+        <Quick href="/market" icon={ShoppingBag} title="Pazar" desc="Otobüs al" />
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-center gap-3 opacity-60">
+          <Bus className="w-5 h-5 text-zinc-500" />
+          <div>
+            <div className="font-medium text-sm">İlk otobüs</div>
+            <div className="text-xs text-zinc-500">{buses[0]?.name} · {buses[0]?.plate}</div>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-function StatCard({ title, value, icon }: { title: string; value: string; icon: React.ReactNode }) {
+function Card({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+}) {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-sm text-zinc-400">{title}</span>
-        {icon}
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+      <div className="text-[10px] text-zinc-500 uppercase tracking-wider">{label}</div>
+      <div className={`text-lg font-bold mt-1 ${accent ? "text-amber-400" : ""}`}>
+        {value}
       </div>
-      <div className="text-xl font-bold">{value}</div>
     </div>
   );
 }
 
-function QuickAction({ href, title, description, icon }: { href: string; title: string; description: string; icon: React.ReactNode }) {
+function Quick({
+  href,
+  icon: Icon,
+  title,
+  desc,
+}: {
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  desc: string;
+}) {
   return (
-    <Link href={href} className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 hover:border-amber-500/50 hover:bg-zinc-900/80 transition group">
-      <div className="w-11 h-11 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center mb-4 group-hover:bg-amber-500/20 transition">
-        {icon}
+    <Link
+      href={href}
+      className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 hover:border-amber-500/40 transition flex items-center gap-3"
+    >
+      <Icon className="w-5 h-5 text-amber-400 shrink-0" />
+      <div>
+        <div className="font-medium text-sm">{title}</div>
+        <div className="text-xs text-zinc-500">{desc}</div>
       </div>
-      <h3 className="font-semibold mb-1">{title}</h3>
-      <p className="text-sm text-zinc-400">{description}</p>
     </Link>
   );
 }

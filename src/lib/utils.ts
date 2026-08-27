@@ -6,11 +6,13 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatMoney(amount: number): string {
-  return new Intl.NumberFormat("tr-TR", {
-    style: "currency",
-    currency: "TRY",
-    maximumFractionDigits: 0,
-  }).format(amount);
+  const n = Math.round(amount);
+  return (
+    new Intl.NumberFormat("tr-TR", {
+      style: "decimal",
+      maximumFractionDigits: 0,
+    }).format(n) + " ₺"
+  );
 }
 
 export function formatPercent(value: number): string {

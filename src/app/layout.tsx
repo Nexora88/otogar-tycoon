@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Otogar Tycoon | Peron Savaşları",
-  description: "Türkiye'nin en rekabetçi otobüs şirketi yönetim simülasyonu.",
+  title: "Otogar Tycoon — Peron Savaşları",
+  description: "Otobüs şirketi yönetim simülasyonu. Geliştirici: Ahmet Eymen Bakraç",
 };
 
 export default function RootLayout({
@@ -23,8 +23,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="tr" className={`${geistSans.variable} ${geistMono.variable} h-full`}>
-      <body className="min-h-full flex flex-col antialiased bg-[#0a0a0b] text-zinc-200">
+    <html lang="tr">
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#0a0a0b] text-zinc-100`}
+      >
         {children}
       </body>
     </html>
