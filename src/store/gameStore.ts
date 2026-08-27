@@ -68,6 +68,13 @@ export type TerminalSlot =
   | "mescit"
   | "otopark";
 
+export interface LedgerRow {
+  id: string;
+  label: string;
+  amount: number;
+  at: number;
+}
+
 export const SLOT_INFO: Record<
   Exclude<TerminalSlot, "empty">,
   { label: string; cost: number; cps: number; repMod: number; risk: number; desc: string }
@@ -169,6 +176,9 @@ export interface GameState {
   pendingCustomer: CustomerCase | null;
   bankDebt: number;
   taxDue: number;
+  kdvDue: number;
+  incomeTaxDue: number;
+  ledger: LedgerRow[];
   terminalName: string;
   terminalSlots: TerminalSlot[];
   terminalBuilt: boolean;
@@ -201,6 +211,7 @@ export interface GameState {
   payBankDebt: (amount: number) => boolean;
   payTax: () => boolean;
   accrueTax: (profit: number) => void;
+  addLedger: (label: string, amount: number) => void;
   setTerminalName: (name: string) => void;
   startTerminalConstruction: () => boolean;
   buildSlot: (index: number, type: TerminalSlot) => boolean;
@@ -253,7 +264,6 @@ const CUSTOMERS: Omit<CustomerCase, "id">[] = [
 ];
 
 const emptySlots = (): TerminalSlot[] => Array.from({ length: 6 }).map(() => "empty");
-
 const MAX_LOAN = 50000;
 
 export const useGameStore = create<GameState>()(
@@ -277,6 +287,9 @@ export const useGameStore = create<GameState>()(
       pendingCustomer: null,
       bankDebt: 0,
       taxDue: 0,
+      kdvDue: 0,
+      incomeTaxDue: 0,
+      ledger: [],
       terminalName: "",
       terminalSlots: emptySlots(),
       terminalBuilt: false,
@@ -304,6 +317,9 @@ export const useGameStore = create<GameState>()(
           pendingCustomer: null,
           bankDebt: 0,
           taxDue: 0,
+          kdvDue: 0,
+          incomeTaxDue: 0,
+          ledger: [],
           terminalName: "",
           terminalSlots: emptySlots(),
           terminalBuilt: false,
@@ -348,6 +364,15 @@ export const useGameStore = create<GameState>()(
         set((s) => ({
           balance: s.balance - listing.price,
           buses: [...s.buses, bus],
+          ledger: [
+            {
+              id: `L-${Date.now()}`,
+              label: `Otobüs alımı: ${listing.name}`,
+              amount: -listing.price,
+              at: Date.now(),
+            },
+            ...s.ledger,
+          ].slice(0, 40),
         }));
         return true;
       },
@@ -379,9 +404,22 @@ export const useGameStore = create<GameState>()(
           reputation: Math.max(0, Math.min(100, s.reputation + event.reputationChange)),
           lastEvent: event,
           taxDue: event.type === "lawsuit" ? s.taxDue + 2000 : s.taxDue,
+          incomeTaxDue: event.type === "lawsuit" ? s.incomeTaxDue + 2000 : s.incomeTaxDue,
           expeditions: s.expeditions.map((e) =>
             e.id === expId ? { ...e, currentEvent: event } : e
           ),
+          ledger:
+            event.moneyChange !== 0
+              ? [
+                  {
+                    id: `L-${Date.now()}`,
+                    label: event.title,
+                    amount: event.moneyChange,
+                    at: Date.now(),
+                  },
+                  ...s.ledger,
+                ].slice(0, 40)
+              : s.ledger,
         }));
       },
       clearLastEvent: () => set({ lastEvent: null }),
@@ -393,14 +431,29 @@ export const useGameStore = create<GameState>()(
         const { balance, accountingLevel } = get();
         const cost = 15000 * accountingLevel;
         if (balance < cost || accountingLevel >= 5) return false;
-        set({ balance: balance - cost, accountingLevel: accountingLevel + 1 });
+        set({
+          balance: balance - cost,
+          accountingLevel: accountingLevel + 1,
+          ledger: [
+            {
+              id: `L-${Date.now()}`,
+              label: `Muhasebe seviye ${accountingLevel + 1}`,
+              amount: -cost,
+              at: Date.now(),
+            },
+            ...get().ledger,
+          ].slice(0, 40),
+        });
         return true;
       },
       upgradeCustomerService: () => {
         const { balance, customerServiceLevel } = get();
         const cost = 12000 * customerServiceLevel;
         if (balance < cost || customerServiceLevel >= 5) return false;
-        set({ balance: balance - cost, customerServiceLevel: customerServiceLevel + 1 });
+        set({
+          balance: balance - cost,
+          customerServiceLevel: customerServiceLevel + 1,
+        });
         return true;
       },
       rentDesk: () => {
@@ -437,6 +490,15 @@ export const useGameStore = create<GameState>()(
             pendingCustomer: null,
             balance: balance - pay,
             reputation: Math.min(100, reputation + 6),
+            ledger: [
+              {
+                id: `L-${Date.now()}`,
+                label: `Tazminat: ${pendingCustomer.name}`,
+                amount: -pay,
+                at: Date.now(),
+              },
+              ...get().ledger,
+            ].slice(0, 40),
           });
         }
       },
@@ -444,10 +506,20 @@ export const useGameStore = create<GameState>()(
       takeBankLoan: (amount) => {
         const a = Math.min(MAX_LOAN, Math.max(0, Math.floor(amount)));
         if (a < 1000) return false;
-        if (get().bankDebt + a > MAX_LOAN * 1.15) return false;
+        if (get().bankDebt + Math.round(a * 1.12) > MAX_LOAN * 1.2) return false;
+        const debt = Math.round(a * 1.12);
         set((s) => ({
           balance: s.balance + a,
-          bankDebt: s.bankDebt + Math.round(a * 1.12),
+          bankDebt: s.bankDebt + debt,
+          ledger: [
+            {
+              id: `L-${Date.now()}`,
+              label: `Kredi çekildi (borç ${debt} yazıldı)`,
+              amount: a,
+              at: Date.now(),
+            },
+            ...s.ledger,
+          ].slice(0, 40),
         }));
         return true;
       },
@@ -455,23 +527,72 @@ export const useGameStore = create<GameState>()(
         const { balance, bankDebt } = get();
         const pay = Math.min(amount, bankDebt, balance);
         if (pay <= 0) return false;
-        set({ balance: balance - pay, bankDebt: bankDebt - pay });
-        return true;
-      },
-      payTax: () => {
-        const { balance, taxDue, reputation } = get();
-        if (taxDue <= 0 || balance < taxDue) return false;
         set({
-          balance: balance - taxDue,
-          taxDue: 0,
-          reputation: Math.min(100, reputation + 2),
+          balance: balance - pay,
+          bankDebt: bankDebt - pay,
+          ledger: [
+            {
+              id: `L-${Date.now()}`,
+              label: "Banka borç ödemesi",
+              amount: -pay,
+              at: Date.now(),
+            },
+            ...get().ledger,
+          ].slice(0, 40),
         });
         return true;
       },
+
+      payTax: () => {
+        const { balance, taxDue, reputation } = get();
+        if (taxDue <= 0 || balance < taxDue) return false;
+        const paid = taxDue;
+        set({
+          balance: balance - paid,
+          taxDue: 0,
+          kdvDue: 0,
+          incomeTaxDue: 0,
+          reputation: Math.min(100, reputation + 3),
+          ledger: [
+            {
+              id: `L-${Date.now()}`,
+              label: "Vergi ödemesi (KDV + Gelir)",
+              amount: -paid,
+              at: Date.now(),
+            },
+            ...get().ledger,
+          ].slice(0, 40),
+        });
+        return true;
+      },
+
       accrueTax: (profit) => {
         if (profit <= 0) return;
-        set((s) => ({ taxDue: s.taxDue + Math.round(profit * 0.08) }));
+        const kdv = Math.round(profit * 0.08);
+        const gel = Math.round(profit * 0.05);
+        set((s) => ({
+          kdvDue: s.kdvDue + kdv,
+          incomeTaxDue: s.incomeTaxDue + gel,
+          taxDue: s.taxDue + kdv + gel,
+          ledger: [
+            {
+              id: `L-${Date.now()}`,
+              label: `Vergi tahakkuk (KDV ${kdv} + GV ${gel})`,
+              amount: -(kdv + gel),
+              at: Date.now(),
+            },
+            ...s.ledger,
+          ].slice(0, 40),
+        }));
       },
+
+      addLedger: (label, amount) =>
+        set((s) => ({
+          ledger: [
+            { id: `L-${Date.now()}`, label, amount, at: Date.now() },
+            ...s.ledger,
+          ].slice(0, 40),
+        })),
 
       setTerminalName: (name) => set({ terminalName: name }),
       startTerminalConstruction: () => {
@@ -483,6 +604,15 @@ export const useGameStore = create<GameState>()(
           terminalName: get().terminalName || "Yeni Terminal",
           reputation: Math.min(100, get().reputation + 8),
           lastPassiveTick: Date.now(),
+          ledger: [
+            {
+              id: `L-${Date.now()}`,
+              label: "Terminal inşaatı",
+              amount: -100000,
+              at: Date.now(),
+            },
+            ...get().ledger,
+          ].slice(0, 40),
         });
         return true;
       },
@@ -520,7 +650,14 @@ export const useGameStore = create<GameState>()(
           if (s !== "empty") cps += SLOT_INFO[s].cps;
         });
         const gain = Math.round(cps * sec * 10) / 10;
-        set((st) => ({ balance: st.balance + gain, lastPassiveTick: now }));
+        if (gain > 0) {
+          set((st) => ({
+            balance: st.balance + gain,
+            lastPassiveTick: now,
+          }));
+        } else {
+          set({ lastPassiveTick: now });
+        }
       },
 
       triggerSecurityRaid: () => {
@@ -546,10 +683,21 @@ export const useGameStore = create<GameState>()(
         const bonus = 1 + get().accountingLevel * 0.05;
         const final = Math.round(baseProfit * bonus);
         get().addMoney(final);
+        set((s) => ({
+          ledger: [
+            {
+              id: `L-${Date.now()}-p`,
+              label: `Sefer geliri (muhasebe x${bonus.toFixed(2)})`,
+              amount: final,
+              at: Date.now(),
+            },
+            ...s.ledger,
+          ].slice(0, 40),
+        }));
         get().accrueTax(Math.max(0, final));
         return final;
       },
     }),
-    { name: "otogar-tycoon-save-v2" }
+    { name: "otogar-tycoon-save-v3" }
   )
 );

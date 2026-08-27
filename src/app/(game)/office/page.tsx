@@ -8,21 +8,21 @@ import {
   Calculator,
   Headphones,
   Building2,
-  Phone,
-  User,
   Landmark,
   ScrollText,
+  User,
+  Phone,
+  FileText,
+  Scale,
 } from "lucide-react";
 
 const QUOTES = [
   "Yurtta sulh, cihanda sulh.",
   "Hayatta en hakiki mürşit ilimdir.",
-  "Öğretmenler: Yeni nesil sizin eseriniz olacaktır.",
   "Egemenlik kayıtsız şartsız milletindir.",
-  "Bir millet ki res steplerini, topraklarını, bilgisini korur; o millet yükselir.",
 ];
 
-const MONTHS_TR = [
+const MONTHS = [
   "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
   "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık",
 ];
@@ -36,6 +36,9 @@ export default function OfficePage() {
     reputation,
     bankDebt,
     taxDue,
+    kdvDue,
+    incomeTaxDue,
+    ledger,
     gameYear,
     upgradeAccounting,
     upgradeCustomerService,
@@ -49,21 +52,20 @@ export default function OfficePage() {
     setOfficeMode,
   } = useGameStore();
 
-  const [quoteIndex, setQuoteIndex] = useState(0);
-  const month = MONTHS_TR[new Date().getMonth()];
+  const [quoteI, setQuoteI] = useState(0);
+  const [loanInput, setLoanInput] = useState(10000);
   const day = new Date().getDate();
+  const month = MONTHS[new Date().getMonth()];
 
   useEffect(() => {
     const t = setInterval(() => {
-      if (!pendingCustomer && Math.random() > 0.65) spawnCustomer();
-    }, 16000);
+      if (!pendingCustomer && Math.random() > 0.7) spawnCustomer();
+    }, 17000);
     return () => clearInterval(t);
   }, [pendingCustomer, spawnCustomer]);
 
   useEffect(() => {
-    const t = setInterval(() => {
-      setQuoteIndex((i) => (i + 1) % QUOTES.length);
-    }, 8000);
+    const t = setInterval(() => setQuoteI((i) => (i + 1) % QUOTES.length), 9000);
     return () => clearInterval(t);
   }, []);
 
@@ -72,251 +74,291 @@ export default function OfficePage() {
 
   return (
     <div className="min-h-full bg-[#1a1410] text-stone-200">
-      {/* Duvar kağıdı hissi */}
-      <div
-        className="min-h-full"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(0deg, transparent, transparent 24px, rgba(0,0,0,0.04) 24px, rgba(0,0,0,0.04) 25px)",
-        }}
-      >
-        <div className="p-6 md:p-8 max-w-6xl mx-auto">
-          {/* Üst bar: mod + yıl */}
-          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-            <div>
-              <h1 className="text-2xl font-bold text-amber-100/95 tracking-tight">
-                Yönetim Yazıhanesi
-              </h1>
-              <p className="text-stone-500 text-sm mt-0.5">
-                Muhasebe · Müşteri Hizmetleri · Resmî işler
-              </p>
+      <div className="p-6 md:p-8 max-w-6xl mx-auto">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-amber-100">Yönetim Yazıhanesi</h1>
+            <p className="text-stone-500 text-sm">Muhasebe · Vergi · Banka · Müşteri</p>
+          </div>
+          <div className="flex gap-2">
+            <Link
+              href="/expeditions"
+              onClick={() => setOfficeMode("drive")}
+              className="px-3 py-2 rounded-lg border border-stone-600 text-sm text-stone-300"
+            >
+              Direksiyon
+            </Link>
+            <span className="px-3 py-2 rounded-lg bg-amber-800/80 text-amber-50 text-sm font-semibold">
+              Ofis
+            </span>
+          </div>
+        </div>
+
+        {/* Portre / söz / takvim */}
+        <div className="grid md:grid-cols-12 gap-3 mb-6">
+          <div className="md:col-span-3 bg-stone-900 border border-amber-900/50 rounded p-3 text-center">
+            <div className="aspect-[3/4] bg-stone-800 border border-stone-600 flex flex-col items-center justify-center">
+              <div className="w-16 h-16 rounded-full bg-stone-600 mb-2 flex items-center justify-center text-2xl text-stone-400 font-serif">
+                A
+              </div>
+              <div className="text-amber-200/90 text-xs font-semibold">MUSTAFA KEMAL</div>
+              <div className="text-amber-200/60 text-[10px] tracking-widest">ATATÜRK</div>
             </div>
+          </div>
+          <div className="md:col-span-6 bg-stone-900/70 border border-stone-700 rounded p-5 flex flex-col justify-between">
             <div className="flex gap-2">
-              <Link
-                href="/expeditions"
-                onClick={() => setOfficeMode("drive")}
-                className="px-4 py-2 rounded-lg border border-stone-600 text-sm text-stone-300 hover:border-amber-600/50 hover:bg-stone-900/50 transition"
-              >
-                🚌 Direksiyon
-              </Link>
-              <span className="px-4 py-2 rounded-lg bg-amber-700/90 text-amber-50 text-sm font-semibold border border-amber-600">
-                🏢 Ofis
-              </span>
-            </div>
-          </div>
-
-          {/* Portre + Takvim + Söz şeridi */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-8">
-            {/* Atatürk portresi (çerçeveli stilize) */}
-            <div className="md:col-span-3 bg-stone-900/80 border-2 border-amber-900/60 rounded-sm p-3 shadow-xl">
-              <div className="aspect-[3/4] relative bg-gradient-to-b from-stone-700 to-stone-900 border border-stone-600 flex flex-col items-center justify-center overflow-hidden">
-                {/* Stilize silüet / portre alanı */}
-                <div className="w-20 h-20 rounded-full bg-stone-600/50 border-2 border-stone-500 mb-3 flex items-center justify-center">
-                  <span className="text-3xl text-stone-400 font-serif">A</span>
-                </div>
-                <div className="text-center px-2">
-                  <div className="text-amber-200/90 text-xs font-semibold tracking-wide">
-                    MUSTAFA KEMAL
-                  </div>
-                  <div className="text-amber-200/70 text-[10px] tracking-[0.2em] mt-0.5">
-                    ATATÜRK
-                  </div>
-                </div>
-                <div className="absolute bottom-2 left-0 right-0 text-center text-[8px] text-stone-500">
-                  Yazıhane duvarı · Resmî portre
-                </div>
-              </div>
-              <p className="text-[10px] text-stone-500 text-center mt-2 italic">
-                Her resmî dairede olduğu gibi
+              <ScrollText className="w-4 h-4 text-amber-600 shrink-0 mt-1" />
+              <p className="font-serif text-lg italic text-amber-100/90">
+                “{QUOTES[quoteI]}”
               </p>
             </div>
-
-            {/* Orta: söz + atmosfer */}
-            <div className="md:col-span-6 bg-stone-900/60 border border-stone-700 rounded-sm p-5 flex flex-col justify-between min-h-[200px]">
-              <div className="flex items-start gap-2">
-                <ScrollText className="w-4 h-4 text-amber-600/80 shrink-0 mt-0.5" />
-                <p className="text-amber-100/90 text-lg md:text-xl font-serif leading-relaxed italic">
-                  “{QUOTES[quoteIndex]}”
-                </p>
-              </div>
-              <div className="mt-4 pt-3 border-t border-stone-700/80 flex justify-between text-[11px] text-stone-500">
-                <span>Gazi Mustafa Kemal Atatürk</span>
-                <span>Türkiye Cumhuriyeti</span>
-              </div>
+            <p className="text-[11px] text-stone-500 mt-3">Gazi Mustafa Kemal Atatürk</p>
+          </div>
+          <div className="md:col-span-3 bg-[#2a2218] border border-stone-600 rounded overflow-hidden">
+            <div className="bg-red-900 text-center text-white text-xs font-bold py-1 tracking-widest">
+              TAKVİM
             </div>
-
-            {/* Takvim 1980'ler */}
-            <div className="md:col-span-3 bg-[#2a2218] border-2 border-stone-600 rounded-sm shadow-lg overflow-hidden">
-              <div className="bg-red-900 text-center py-1.5 text-white text-xs font-bold tracking-widest">
-                TAKVİM
-              </div>
-              <div className="p-4 text-center">
-                <div className="text-stone-400 text-xs uppercase tracking-wider">{month}</div>
-                <div className="text-5xl font-bold text-stone-100 my-1 tabular-nums">{day}</div>
-                <div className="text-2xl font-serif text-amber-500/90">{gameYear}</div>
-                <div className="mt-2 text-[10px] text-stone-500 leading-tight">
-                  Perşembe ruhu · Eski Türkiye
-                  <br />
-                  Yazıhane saati
-                </div>
-              </div>
+            <div className="p-4 text-center">
+              <div className="text-stone-400 text-xs">{month}</div>
+              <div className="text-4xl font-bold my-1">{day}</div>
+              <div className="text-xl text-amber-500 font-serif">{gameYear}</div>
             </div>
           </div>
+        </div>
 
-          {/* Odalar */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <OfficeCard
-              icon={<Calculator className="w-5 h-5 text-emerald-400" />}
-              title="Muhasebe"
-              level={`Seviye ${accountingLevel}/5`}
-              desc={`Sefer kârı +%${accountingLevel * 5}. Defterler burada.`}
-              actionLabel={accountingLevel >= 5 ? "Maksimum" : `Yükselt — ${formatMoney(accCost)}`}
-              onAction={() => {
+        {/* === MUHASEBE DETAY === */}
+        <div className="bg-stone-900/80 border border-stone-700 rounded-lg p-5 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Scale className="w-5 h-5 text-emerald-400" />
+            <h2 className="font-bold text-lg">Muhasebe & Vergi Dairesi</h2>
+            <span className="text-xs text-stone-500 ml-auto">
+              Seviye {accountingLevel}/5 · kâr +%{accountingLevel * 5}
+            </span>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+            <TaxCard
+              title="Kasa"
+              value={formatMoney(balance)}
+              sub="Nakit"
+              color="text-amber-400"
+            />
+            <TaxCard
+              title="KDV tahakkuk"
+              value={formatMoney(kdvDue ?? 0)}
+              sub="%8 sefer kârı"
+              color="text-sky-400"
+            />
+            <TaxCard
+              title="Gelir vergisi"
+              value={formatMoney(incomeTaxDue ?? 0)}
+              sub="%5 sefer kârı"
+              color="text-violet-400"
+            />
+            <TaxCard
+              title="Toplam borç vergi"
+              value={formatMoney(taxDue)}
+              sub="Ödenecek"
+              color="text-red-400"
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-2 mb-4">
+            <button
+              type="button"
+              onClick={() => {
+                if (!payTax()) alert("Vergi yok veya kasa yetersiz");
+              }}
+              className="px-4 py-2 rounded-lg bg-emerald-800/40 border border-emerald-700 text-emerald-200 text-sm hover:bg-emerald-800/60"
+            >
+              Tüm vergileri öde ({formatMoney(taxDue)})
+            </button>
+            <button
+              type="button"
+              onClick={() => {
                 if (!upgradeAccounting()) alert("Yetersiz bakiye veya max seviye");
               }}
               disabled={accountingLevel >= 5}
-              accent="emerald"
-            />
-            <OfficeCard
-              icon={<Headphones className="w-5 h-5 text-sky-400" />}
-              title="Müşteri Hizmetleri"
-              level={`Seviye ${customerServiceLevel}/5`}
-              desc="Şikayet, kayıp eşya, rötar. İtibar burada korunur."
-              actionLabel={
-                customerServiceLevel >= 5 ? "Maksimum" : `Yükselt — ${formatMoney(csCost)}`
-              }
-              onAction={() => {
-                if (!upgradeCustomerService()) alert("Yetersiz bakiye veya max seviye");
-              }}
-              disabled={customerServiceLevel >= 5}
-              accent="sky"
-            />
-            <OfficeCard
-              icon={<Building2 className="w-5 h-5 text-amber-400" />}
-              title="Yazıhane Masası"
-              level={deskRented ? "Kiralandı" : "Boş"}
-              desc="Otogarda masa. Boncuk Turizm işleri için."
-              actionLabel={deskRented ? "Aktif" : `Kirala — ${formatMoney(25000)}`}
-              onAction={() => {
-                if (!rentDesk()) alert(deskRented ? "Zaten var" : "25.000 ₺ gerekli");
-              }}
-              disabled={deskRented}
-              accent="amber"
-            />
+              className="px-4 py-2 rounded-lg border border-stone-600 text-sm text-stone-300 disabled:opacity-40"
+            >
+              Muhasebe yükselt — {formatMoney(accCost)}
+            </button>
           </div>
 
-          {/* Banka & vergi */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div className="bg-stone-900/70 border border-stone-700 rounded-sm p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <Landmark className="w-4 h-4 text-amber-500" />
-                <span className="font-semibold text-stone-200">Banka Ziraat — Kredi</span>
-              </div>
-              <p className="text-sm text-stone-500 mb-3">
-                Borç: <span className="text-red-400 font-mono">{formatMoney(bankDebt)}</span>
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => takeBankLoan(20000)}
-                  className="px-3 py-1.5 text-xs rounded border border-stone-600 hover:border-amber-600 text-stone-300"
-                >
-                  +20.000 borç al
-                </button>
-                <button
-                  onClick={() => payBankDebt(10000)}
-                  className="px-3 py-1.5 text-xs rounded border border-stone-600 hover:border-emerald-600 text-stone-300"
-                >
-                  10.000 öde
-                </button>
-              </div>
+          <div className="text-xs text-stone-500 mb-2 flex items-center gap-1">
+            <FileText className="w-3.5 h-3.5" />
+            Defter-i kebir (son hareketler)
+          </div>
+          <div className="max-h-40 overflow-y-auto rounded border border-stone-800 bg-stone-950/80">
+            {(ledger ?? []).length === 0 ? (
+              <p className="p-3 text-xs text-stone-600">Henüz kayıt yok. Sefer bitince dolacak.</p>
+            ) : (
+              <table className="w-full text-xs">
+                <thead className="text-stone-500 border-b border-stone-800">
+                  <tr>
+                    <th className="text-left p-2 font-medium">Açıklama</th>
+                    <th className="text-right p-2 font-medium">Tutar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(ledger ?? []).slice(0, 15).map((row) => (
+                    <tr key={row.id} className="border-b border-stone-900">
+                      <td className="p-2 text-stone-400">{row.label}</td>
+                      <td
+                        className={`p-2 text-right font-mono ${
+                          row.amount >= 0 ? "text-emerald-400" : "text-red-400"
+                        }`}
+                      >
+                        {row.amount >= 0 ? "+" : ""}
+                        {formatMoney(row.amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+          <p className="text-[10px] text-stone-600 mt-2">
+            Not: KDV %8 + gelir payı %5 sefer kârından tahakkuk eder. Muhasebe seviyesi net kârı artırır.
+          </p>
+        </div>
+
+        {/* Banka */}
+        <div className="grid md:grid-cols-2 gap-4 mb-6">
+          <div className="bg-stone-900/70 border border-stone-700 rounded-lg p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <Landmark className="w-4 h-4 text-amber-500" />
+              <span className="font-semibold">Banka kredisi</span>
             </div>
-            <div className="bg-stone-900/70 border border-stone-700 rounded-sm p-5">
-              <div className="font-semibold text-stone-200 mb-2">Vergi Dairesi</div>
-              <p className="text-sm text-stone-500 mb-3">
-                Tahakkuk: <span className="text-amber-400 font-mono">{formatMoney(taxDue)}</span>
-              </p>
+            <p className="text-sm text-stone-500 mb-2">
+              Borç: <span className="text-red-400 font-mono">{formatMoney(bankDebt)}</span>
+              <span className="text-stone-600"> · limit ~50.000</span>
+            </p>
+            <div className="flex flex-wrap gap-2 items-center mb-2">
+              <input
+                type="number"
+                min={1000}
+                max={50000}
+                step={1000}
+                value={loanInput}
+                onChange={(e) => setLoanInput(Number(e.target.value))}
+                className="w-28 bg-stone-950 border border-stone-600 rounded px-2 py-1.5 text-sm"
+              />
               <button
+                type="button"
                 onClick={() => {
-                  if (!payTax()) alert("Vergi yok veya bakiye yetersiz");
+                  if (!takeBankLoan(loanInput)) alert("Limit veya tutar geçersiz");
                 }}
-                className="px-3 py-1.5 text-xs rounded bg-amber-800/40 border border-amber-700 text-amber-200 hover:bg-amber-800/60"
+                className="px-3 py-1.5 text-xs rounded border border-stone-600 hover:border-amber-600"
               >
-                Vergiyi öde (itibar +2)
+                Kredi çek (%12 faizle borç yazılır)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!payBankDebt(10000)) alert("Ödeme yapılamadı");
+                }}
+                className="px-3 py-1.5 text-xs rounded border border-stone-600 hover:border-emerald-600"
+              >
+                10.000 öde
               </button>
             </div>
           </div>
 
-          {/* Özet */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-8">
-            <Stat label="Kasa" value={formatMoney(balance)} />
-            <Stat label="İtibar" value={`${reputation}/100`} />
-            <Stat label="Borç" value={formatMoney(bankDebt)} />
-            <Stat
-              label="Hat"
-              value={pendingCustomer ? "Müşteri var!" : "Sakin"}
-              alert={!!pendingCustomer}
-            />
-          </div>
-
-          <div className="text-center">
-            <Link
-              href="/terminal"
-              className="inline-flex items-center gap-2 text-sm text-amber-500/90 hover:text-amber-400"
-            >
-              <Building2 className="w-4 h-4" />
-              Terminalim → İnşaat ve dükkânlar
-            </Link>
+          <div className="bg-stone-900/70 border border-stone-700 rounded-lg p-5">
+            <div className="font-semibold mb-2">Özet</div>
+            <ul className="text-sm text-stone-400 space-y-1">
+              <li>İtibar: {reputation}/100</li>
+              <li>Muhasebe bonusu: +%{accountingLevel * 5} sefer kârı</li>
+              <li>Müşteri hizmetleri: Sv. {customerServiceLevel}</li>
+              <li>Yazıhane: {deskRented ? "Kiralı" : "Boş"}</li>
+            </ul>
           </div>
         </div>
+
+        {/* Odalar */}
+        <div className="grid md:grid-cols-3 gap-4 mb-6">
+          <Room
+            icon={<Calculator className="w-5 h-5 text-emerald-400" />}
+            title="Muhasebe ofisi"
+            level={`Sv. ${accountingLevel}/5`}
+            desc="Defter, vergi, kâr optimizasyonu."
+            btn={accountingLevel >= 5 ? "Max" : `Yükselt ${formatMoney(accCost)}`}
+            onClick={() => {
+              if (!upgradeAccounting()) alert("Olmadı");
+            }}
+            disabled={accountingLevel >= 5}
+          />
+          <Room
+            icon={<Headphones className="w-5 h-5 text-sky-400" />}
+            title="Müşteri hizmetleri"
+            level={`Sv. ${customerServiceLevel}/5`}
+            desc="Şikayet ve kayıp eşya."
+            btn={
+              customerServiceLevel >= 5 ? "Max" : `Yükselt ${formatMoney(csCost)}`
+            }
+            onClick={() => {
+              if (!upgradeCustomerService()) alert("Olmadı");
+            }}
+            disabled={customerServiceLevel >= 5}
+          />
+          <Room
+            icon={<Building2 className="w-5 h-5 text-amber-400" />}
+            title="Yazıhane masası"
+            level={deskRented ? "Aktif" : "Boş"}
+            desc="25.000 ₺ kira."
+            btn={deskRented ? "Kiralandı" : "Kirala 25.000 ₺"}
+            onClick={() => {
+              if (!rentDesk()) alert("Olmadı");
+            }}
+            disabled={deskRented}
+          />
+        </div>
+
+        <Link href="/terminal" className="text-sm text-amber-500 hover:text-amber-400">
+          → Terminalim
+        </Link>
       </div>
 
-      {/* Müşteri modal */}
       {pendingCustomer && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/75 p-4">
-          <div className="bg-stone-900 border border-stone-600 rounded-lg max-w-md w-full p-6 shadow-2xl">
-            <div className="flex items-start gap-4 mb-4">
-              <div className="w-14 h-14 rounded-full bg-stone-800 border-2 border-stone-500 flex items-center justify-center">
-                <User className="w-7 h-7 text-stone-400" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4">
+          <div className="bg-stone-900 border border-stone-600 rounded-lg max-w-md w-full p-6">
+            <div className="flex gap-3 mb-3">
+              <div className="w-12 h-12 rounded-full bg-stone-800 border border-stone-500 flex items-center justify-center">
+                <User className="w-6 h-6 text-stone-400" />
               </div>
               <div>
-                <div className="font-bold text-lg text-stone-100">{pendingCustomer.name}</div>
-                <div className="text-xs text-stone-500 flex items-center gap-1 mt-0.5">
+                <div className="font-bold">{pendingCustomer.name}</div>
+                <div className="text-xs text-stone-500 flex items-center gap-1">
                   <Phone className="w-3 h-3" />
-                  {pendingCustomer.mood === "angry"
-                    ? "Öfkeli"
-                    : pendingCustomer.mood === "ironic"
-                    ? "İğneleyici"
-                    : "Nazik"}
+                  {pendingCustomer.mood}
                 </div>
               </div>
             </div>
-
-            <div className="relative bg-stone-800/80 border border-stone-600 rounded-lg p-4 mb-5">
-              <div className="absolute -top-2 left-6 w-3 h-3 bg-stone-800 border-l border-t border-stone-600 rotate-45" />
-              <p className="text-stone-200 text-sm leading-relaxed">
-                “{pendingCustomer.issue}”
-              </p>
-            </div>
-
-            <p className="text-[11px] text-stone-500 mb-3">Cevabınız?</p>
+            <p className="text-sm text-stone-300 mb-4 bg-stone-800/80 p-3 rounded border border-stone-700">
+              “{pendingCustomer.issue}”
+            </p>
             <div className="space-y-2">
               <button
+                type="button"
                 onClick={() => resolveCustomer("dismiss")}
-                className="w-full text-left px-4 py-2.5 rounded border border-stone-600 text-sm text-stone-300 hover:bg-stone-800"
+                className="w-full text-left text-sm px-3 py-2 border border-stone-600 rounded hover:bg-stone-800"
               >
-                “Kayıp eşya bizi ilgilendirmez.” <span className="text-red-400/80 text-xs">(İtibar −)</span>
+                İlgilenmiyoruz (itibar −)
               </button>
               <button
+                type="button"
                 onClick={() => resolveCustomer("help")}
-                className="w-full text-left px-4 py-2.5 rounded border border-emerald-800/50 text-sm text-emerald-200/90 hover:bg-emerald-950/40"
+                className="w-full text-left text-sm px-3 py-2 border border-emerald-800 rounded text-emerald-200"
               >
-                “Hemen bakıyoruz, eşya neydi efendim?” <span className="text-emerald-500/80 text-xs">(İtibar +)</span>
+                Yardımcı olalım (itibar +)
               </button>
               <button
+                type="button"
                 onClick={() => resolveCustomer("compensate")}
-                className="w-full text-left px-4 py-2.5 rounded border border-amber-800/50 text-sm text-amber-200/90 hover:bg-amber-950/30"
+                className="w-full text-left text-sm px-3 py-2 border border-amber-800 rounded text-amber-200"
               >
-                “Özür dileriz — tazminat ödüyoruz.” <span className="text-amber-500/80 text-xs">(₺ − / İtibar ++)</span>
+                Tazminat öde (₺ − / itibar ++)
               </button>
             </div>
           </div>
@@ -326,67 +368,61 @@ export default function OfficePage() {
   );
 }
 
-function OfficeCard({
+function TaxCard({
+  title,
+  value,
+  sub,
+  color,
+}: {
+  title: string;
+  value: string;
+  sub: string;
+  color: string;
+}) {
+  return (
+    <div className="bg-stone-950 border border-stone-800 rounded-lg p-3">
+      <div className="text-[10px] text-stone-500 uppercase tracking-wider">{title}</div>
+      <div className={`text-lg font-bold font-mono ${color}`}>{value}</div>
+      <div className="text-[10px] text-stone-600">{sub}</div>
+    </div>
+  );
+}
+
+function Room({
   icon,
   title,
   level,
   desc,
-  actionLabel,
-  onAction,
+  btn,
+  onClick,
   disabled,
-  accent,
 }: {
   icon: React.ReactNode;
   title: string;
   level: string;
   desc: string;
-  actionLabel: string;
-  onAction: () => void;
+  btn: string;
+  onClick: () => void;
   disabled?: boolean;
-  accent: string;
 }) {
   return (
-    <div className="bg-stone-900/70 border border-stone-700 rounded-sm p-5">
-      <div className="flex items-center gap-3 mb-3">
-        <div className="w-10 h-10 rounded bg-stone-800 flex items-center justify-center">{icon}</div>
+    <div className="bg-stone-900/70 border border-stone-700 rounded-lg p-4">
+      <div className="flex items-center gap-2 mb-2">
+        {icon}
         <div>
-          <div className="font-semibold text-stone-100">{title}</div>
-          <div className="text-[11px] text-stone-500">{level}</div>
+          <div className="font-semibold text-sm">{title}</div>
+          <div className="text-[10px] text-stone-500">{level}</div>
         </div>
       </div>
-      <p className="text-sm text-stone-400 mb-4 leading-relaxed">{desc}</p>
+      <p className="text-xs text-stone-400 mb-3">{desc}</p>
       <button
-        onClick={onAction}
+        type="button"
+        onClick={onClick}
         disabled={disabled}
-        className={`w-full py-2 rounded text-sm border transition disabled:opacity-40 ${
-          accent === "emerald"
-            ? "border-emerald-800 text-emerald-400 hover:bg-emerald-950/40"
-            : accent === "sky"
-            ? "border-sky-800 text-sky-400 hover:bg-sky-950/40"
-            : "border-amber-800 text-amber-400 hover:bg-amber-950/40"
-        }`}
+        className="w-full py-2 text-xs rounded border border-stone-600 text-stone-300 disabled:opacity-40"
       >
-        {actionLabel}
+        {btn}
       </button>
-    </div>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  alert,
-}: {
-  label: string;
-  value: string;
-  alert?: boolean;
-}) {
-  return (
-    <div className="bg-stone-950/80 border border-stone-800 rounded px-3 py-2">
-      <div className="text-[9px] text-stone-500 tracking-wider">{label}</div>
-      <div className={`text-sm font-semibold ${alert ? "text-amber-400" : "text-stone-200"}`}>
-        {value}
-      </div>
     </div>
   );
 }
