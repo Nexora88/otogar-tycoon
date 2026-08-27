@@ -4,6 +4,7 @@ import { persist } from "zustand/middleware";
 export type BusColor = "blue" | "red" | "green" | "black" | "white" | "orange";
 export type Catering = "water" | "snack" | "vip";
 export type ExpeditionStatus = "filling" | "departed" | "completed" | "cancelled";
+export type OfficeTheme = "classic" | "school" | "modern";
 
 export interface GameBus {
   id: string;
@@ -47,7 +48,9 @@ export interface Expedition {
   passengers: Passenger[];
   createdAt: number;
   currentEvent?: RoadEvent | null;
-  driveMode?: "self" | "driver";
+  driverId?: string | null;
+  /** Sürüş kilitli — hep otomatik şoför */
+  driveMode?: "driver";
 }
 
 export interface CustomerCase {
@@ -75,66 +78,71 @@ export interface LedgerRow {
   at: number;
 }
 
+export interface Driver {
+  id: string;
+  name: string;
+  role: "driver" | "muavin";
+  skill: number;
+  fatigue: number;
+  wage: number;
+  suspicious: boolean;
+  hiredAt: number;
+}
+
+export interface PhoneMessage {
+  id: string;
+  from: string;
+  body: string;
+  at: number;
+  read: boolean;
+  type: "sms" | "call";
+}
+
+export interface InterviewCandidate {
+  id: string;
+  name: string;
+  role: "driver" | "muavin";
+  skill: number;
+  wage: number;
+  suspicious: boolean;
+  answers: string[];
+}
+
+export interface LastTicket {
+  expId: string;
+  origin: string;
+  destination: string;
+  sold: number;
+  price: number;
+  revenue: number;
+  cost: number;
+  profit: number;
+  driverName: string;
+  at: number;
+}
+
+export const CITIES = [
+  { id: "edirne", name: "Edirne", region: "Marmara", plotCost: 35000, licenseCost: 12000, x: 12, y: 22 },
+  { id: "istanbul", name: "İstanbul", region: "Marmara", plotCost: 90000, licenseCost: 28000, x: 22, y: 28 },
+  { id: "ankara", name: "Ankara", region: "İç Anadolu", plotCost: 55000, licenseCost: 18000, x: 48, y: 42 },
+  { id: "izmir", name: "İzmir", region: "Ege", plotCost: 60000, licenseCost: 20000, x: 18, y: 55 },
+  { id: "antalya", name: "Antalya", region: "Akdeniz", plotCost: 50000, licenseCost: 16000, x: 42, y: 78 },
+  { id: "samsun", name: "Samsun", region: "Karadeniz", plotCost: 40000, licenseCost: 14000, x: 58, y: 28 },
+  { id: "adana", name: "Adana", region: "Akdeniz", plotCost: 45000, licenseCost: 15000, x: 62, y: 72 },
+  { id: "erzurum", name: "Erzurum", region: "Doğu", plotCost: 32000, licenseCost: 11000, x: 82, y: 38 },
+] as const;
+
 export const SLOT_INFO: Record<
   Exclude<TerminalSlot, "empty">,
   { label: string; cost: number; cps: number; repMod: number; risk: number; desc: string }
 > = {
-  toilet: {
-    label: "Otogar Tuvaleti",
-    cost: 12000,
-    cps: 0.85,
-    repMod: 0,
-    risk: 0,
-    desc: "Bozuk paran yoksa turnikeden geçemezsin.",
-  },
-  bufe: {
-    label: "Peron Büfesi",
-    cost: 28000,
-    cps: 2.6,
-    repMod: -1,
-    risk: 6,
-    desc: "Bayat tost & sıcak ayran.",
-  },
-  emanet: {
-    label: "Emanetçi",
-    cost: 45000,
-    cps: 4.4,
-    repMod: 1,
-    risk: 20,
-    desc: "Yüksek kâr, zabıta riski.",
-  },
-  cayci: {
-    label: "Çay Ocağı",
-    cost: 22000,
-    cps: 1.7,
-    repMod: 1,
-    risk: 2,
-    desc: "İnce belli bardak.",
-  },
-  bilet: {
-    label: "Bilet Gişesi",
-    cost: 32000,
-    cps: 2.1,
-    repMod: 2,
-    risk: 0,
-    desc: "Resmî gişe.",
-  },
-  mescit: {
-    label: "Mescit",
-    cost: 15000,
-    cps: 0.35,
-    repMod: 4,
-    risk: 0,
-    desc: "Huzur + itibar.",
-  },
-  otopark: {
-    label: "Otopark",
-    cost: 40000,
-    cps: 1.9,
-    repMod: 0,
-    risk: 5,
-    desc: "Araç parkı.",
-  },
+  toilet: { label: "Otogar Tuvaleti", cost: 12000, cps: 0.85, repMod: 0, risk: 0, desc: "Turnike." },
+  bufe: { label: "Peron Büfesi", cost: 28000, cps: 2.6, repMod: -1, risk: 6, desc: "Tost & ayran." },
+  emanet: { label: "Emanetçi", cost: 45000, cps: 4.4, repMod: 1, risk: 20, desc: "Yüksek kâr." },
+  cayci: { label: "Çay Ocağı", cost: 22000, cps: 1.7, repMod: 1, risk: 2, desc: "İnce belli." },
+  bilet: { label: "Bilet Gişesi", cost: 32000, cps: 2.1, repMod: 2, risk: 0, desc: "Resmî gişe." },
+  mescit: { label: "Mescit", cost: 15000, cps: 0.35, repMod: 4, risk: 0, desc: "İtibar." },
+  otopark: { label: "Otopark", cost: 40000, cps: 1.9, repMod: 0, risk: 5, desc: "Park." },
 };
 
 export interface BusListing {
@@ -185,6 +193,16 @@ export interface GameState {
   gameYear: number;
   lastPassiveTick: number;
   securityRisk: number;
+  homeCityId: string | null;
+  setupDone: boolean;
+  drivers: Driver[];
+  phoneMessages: PhoneMessage[];
+  phoneOpen: boolean;
+  officeTheme: OfficeTheme;
+  pendingInterview: InterviewCandidate | null;
+  lastTicket: LastTicket | null;
+  /** Sürüş modu kilitli */
+  drivingUnlocked: boolean;
 
   startAsGuest: () => void;
   setCompanyName: (name: string) => void;
@@ -218,6 +236,17 @@ export interface GameState {
   collectPassiveIncome: () => void;
   triggerSecurityRaid: () => void;
   settleExpeditionProfit: (baseProfit: number) => number;
+  completeCitySetup: (cityId: string) => boolean;
+  hireDriver: (d: Omit<Driver, "id" | "hiredAt" | "fatigue">) => boolean;
+  restDriver: (id: string) => void;
+  addFatigue: (id: string, amount: number) => void;
+  pushPhone: (from: string, body: string, type?: "sms" | "call") => void;
+  markPhoneRead: () => void;
+  setPhoneOpen: (v: boolean) => void;
+  setOfficeTheme: (t: OfficeTheme) => void;
+  spawnInterview: (role: "driver" | "muavin") => void;
+  finishInterview: (hire: boolean) => void;
+  setLastTicket: (t: LastTicket | null) => void;
 }
 
 const startingBus: GameBus = {
@@ -250,15 +279,13 @@ const ROAD_EVENTS: Omit<RoadEvent, "id">[] = [
   { type: "police", title: "Çevirme", description: "Kontrol.", moneyChange: 0, reputationChange: 0, emoji: "🚓" },
   { type: "accident", title: "Kaza", description: "Hasar.", moneyChange: -9000, reputationChange: -3, emoji: "💥" },
   { type: "lawsuit", title: "Dava", description: "Tazminat.", moneyChange: -15000, reputationChange: -5, emoji: "⚖️" },
-  { type: "fight", title: "Kavga", description: "Yol kenarı.", moneyChange: 0, reputationChange: 1, emoji: "🥊" },
   { type: "funny", title: "Anons", description: "Mikrofon açık.", moneyChange: 0, reputationChange: -2, emoji: "🎙️" },
-  { type: "weather", title: "Sağanak", description: "Tempo düştü.", moneyChange: 0, reputationChange: 0, emoji: "🌧️" },
+  { type: "weather", title: "Sağanak", description: "Rötar.", moneyChange: 0, reputationChange: 0, emoji: "🌧️" },
 ];
 
 const CUSTOMERS: Omit<CustomerCase, "id">[] = [
   { name: "Ayşe Teyze", issue: "Valizim kayboldu!", mood: "angry", type: "lost_item" },
   { name: "Murat Bey", issue: "Ceketimi unuttum.", mood: "polite", type: "lost_item" },
-  { name: "Cemal Amca", issue: "Eşya bizden sorulmaz mı?", mood: "ironic", type: "rude" },
   { name: "Serkan", issue: "3 saat rötar.", mood: "angry", type: "delay" },
   { name: "Avukat Dündar", issue: "Tazminat konuşalım.", mood: "angry", type: "accident_claim" },
 ];
@@ -266,67 +293,51 @@ const CUSTOMERS: Omit<CustomerCase, "id">[] = [
 const emptySlots = (): TerminalSlot[] => Array.from({ length: 6 }).map(() => "empty");
 const MAX_LOAN = 50000;
 
+const initialSlice = () => ({
+  isGuest: true,
+  companyName: "Misafir Şirket",
+  balance: 75000,
+  reputation: 45,
+  buses: [{ ...startingBus }] as GameBus[],
+  expeditions: [] as Expedition[],
+  hasPlayedOnce: false,
+  complaints: [] as string[],
+  lastEvent: null as RoadEvent | null,
+  showComplaintModal: false,
+  currentComplaint: null as string | null,
+  officeMode: "office" as const,
+  accountingLevel: 1,
+  customerServiceLevel: 1,
+  deskRented: false,
+  pendingCustomer: null as CustomerCase | null,
+  bankDebt: 0,
+  taxDue: 0,
+  kdvDue: 0,
+  incomeTaxDue: 0,
+  ledger: [] as LedgerRow[],
+  terminalName: "",
+  terminalSlots: emptySlots(),
+  terminalBuilt: false,
+  gameYear: 1987,
+  lastPassiveTick: Date.now(),
+  securityRisk: 0,
+  homeCityId: null as string | null,
+  setupDone: false,
+  drivers: [] as Driver[],
+  phoneMessages: [] as PhoneMessage[],
+  phoneOpen: false,
+  officeTheme: "classic" as OfficeTheme,
+  pendingInterview: null as InterviewCandidate | null,
+  lastTicket: null as LastTicket | null,
+  drivingUnlocked: false,
+});
+
 export const useGameStore = create<GameState>()(
   persist(
     (set, get) => ({
-      isGuest: true,
-      companyName: "Misafir Şirket",
-      balance: 75000,
-      reputation: 45,
-      buses: [startingBus],
-      expeditions: [],
-      hasPlayedOnce: false,
-      complaints: [],
-      lastEvent: null,
-      showComplaintModal: false,
-      currentComplaint: null,
-      officeMode: "drive",
-      accountingLevel: 1,
-      customerServiceLevel: 1,
-      deskRented: false,
-      pendingCustomer: null,
-      bankDebt: 0,
-      taxDue: 0,
-      kdvDue: 0,
-      incomeTaxDue: 0,
-      ledger: [],
-      terminalName: "",
-      terminalSlots: emptySlots(),
-      terminalBuilt: false,
-      gameYear: 1987,
-      lastPassiveTick: Date.now(),
-      securityRisk: 0,
+      ...initialSlice(),
 
-      startAsGuest: () =>
-        set({
-          isGuest: true,
-          companyName: "Misafir Şirket",
-          balance: 75000,
-          reputation: 45,
-          buses: [{ ...startingBus }],
-          expeditions: [],
-          hasPlayedOnce: false,
-          complaints: [],
-          lastEvent: null,
-          showComplaintModal: false,
-          currentComplaint: null,
-          officeMode: "drive",
-          accountingLevel: 1,
-          customerServiceLevel: 1,
-          deskRented: false,
-          pendingCustomer: null,
-          bankDebt: 0,
-          taxDue: 0,
-          kdvDue: 0,
-          incomeTaxDue: 0,
-          ledger: [],
-          terminalName: "",
-          terminalSlots: emptySlots(),
-          terminalBuilt: false,
-          gameYear: 1987,
-          lastPassiveTick: Date.now(),
-          securityRisk: 0,
-        }),
+      startAsGuest: () => set({ ...initialSlice(), buses: [{ ...startingBus }] }),
 
       setCompanyName: (name) => set({ companyName: name }),
       addMoney: (a) => set((s) => ({ balance: s.balance + a })),
@@ -364,20 +375,16 @@ export const useGameStore = create<GameState>()(
         set((s) => ({
           balance: s.balance - listing.price,
           buses: [...s.buses, bus],
-          ledger: [
-            {
-              id: `L-${Date.now()}`,
-              label: `Otobüs alımı: ${listing.name}`,
-              amount: -listing.price,
-              at: Date.now(),
-            },
-            ...s.ledger,
-          ].slice(0, 40),
         }));
+        get().addLedger(`Otobüs: ${listing.name}`, -listing.price);
         return true;
       },
 
-      addExpedition: (exp) => set((s) => ({ expeditions: [exp, ...s.expeditions] })),
+      addExpedition: (exp) =>
+        set((s) => ({
+          expeditions: [{ ...exp, driveMode: "driver" }, ...s.expeditions],
+        })),
+
       updateExpedition: (id, data) =>
         set((s) => ({
           expeditions: s.expeditions.map((e) => (e.id === id ? { ...e, ...data } : e)),
@@ -393,67 +400,36 @@ export const useGameStore = create<GameState>()(
       closeComplaint: () => set({ showComplaintModal: false, currentComplaint: null }),
 
       triggerRoadEvent: (expId) => {
-        const pool =
-          Math.random() > 0.86
-            ? ROAD_EVENTS.filter((e) => e.type === "accident" || e.type === "lawsuit")
-            : ROAD_EVENTS;
-        const t = pool[Math.floor(Math.random() * pool.length)];
+        const t = ROAD_EVENTS[Math.floor(Math.random() * ROAD_EVENTS.length)];
         const event: RoadEvent = { ...t, id: `evt-${Date.now()}` };
         set((s) => ({
           balance: s.balance + event.moneyChange,
           reputation: Math.max(0, Math.min(100, s.reputation + event.reputationChange)),
           lastEvent: event,
-          taxDue: event.type === "lawsuit" ? s.taxDue + 2000 : s.taxDue,
-          incomeTaxDue: event.type === "lawsuit" ? s.incomeTaxDue + 2000 : s.incomeTaxDue,
           expeditions: s.expeditions.map((e) =>
             e.id === expId ? { ...e, currentEvent: event } : e
           ),
-          ledger:
-            event.moneyChange !== 0
-              ? [
-                  {
-                    id: `L-${Date.now()}`,
-                    label: event.title,
-                    amount: event.moneyChange,
-                    at: Date.now(),
-                  },
-                  ...s.ledger,
-                ].slice(0, 40)
-              : s.ledger,
         }));
+        if (event.moneyChange !== 0) get().addLedger(event.title, event.moneyChange);
       },
       clearLastEvent: () => set({ lastEvent: null }),
       setHasPlayedOnce: () => set({ hasPlayedOnce: true }),
       resetGame: () => get().startAsGuest(),
-      setOfficeMode: (mode) => set({ officeMode: mode }),
+      setOfficeMode: () => set({ officeMode: "office" }),
 
       upgradeAccounting: () => {
         const { balance, accountingLevel } = get();
         const cost = 15000 * accountingLevel;
         if (balance < cost || accountingLevel >= 5) return false;
-        set({
-          balance: balance - cost,
-          accountingLevel: accountingLevel + 1,
-          ledger: [
-            {
-              id: `L-${Date.now()}`,
-              label: `Muhasebe seviye ${accountingLevel + 1}`,
-              amount: -cost,
-              at: Date.now(),
-            },
-            ...get().ledger,
-          ].slice(0, 40),
-        });
+        set({ balance: balance - cost, accountingLevel: accountingLevel + 1 });
+        get().addLedger(`Muhasebe sv.${accountingLevel + 1}`, -cost);
         return true;
       },
       upgradeCustomerService: () => {
         const { balance, customerServiceLevel } = get();
         const cost = 12000 * customerServiceLevel;
         if (balance < cost || customerServiceLevel >= 5) return false;
-        set({
-          balance: balance - cost,
-          customerServiceLevel: customerServiceLevel + 1,
-        });
+        set({ balance: balance - cost, customerServiceLevel: customerServiceLevel + 1 });
         return true;
       },
       rentDesk: () => {
@@ -490,16 +466,8 @@ export const useGameStore = create<GameState>()(
             pendingCustomer: null,
             balance: balance - pay,
             reputation: Math.min(100, reputation + 6),
-            ledger: [
-              {
-                id: `L-${Date.now()}`,
-                label: `Tazminat: ${pendingCustomer.name}`,
-                amount: -pay,
-                at: Date.now(),
-              },
-              ...get().ledger,
-            ].slice(0, 40),
           });
+          get().addLedger(`Tazminat: ${pendingCustomer.name}`, -pay);
         }
       },
 
@@ -508,38 +476,16 @@ export const useGameStore = create<GameState>()(
         if (a < 1000) return false;
         if (get().bankDebt + Math.round(a * 1.12) > MAX_LOAN * 1.2) return false;
         const debt = Math.round(a * 1.12);
-        set((s) => ({
-          balance: s.balance + a,
-          bankDebt: s.bankDebt + debt,
-          ledger: [
-            {
-              id: `L-${Date.now()}`,
-              label: `Kredi çekildi (borç ${debt} yazıldı)`,
-              amount: a,
-              at: Date.now(),
-            },
-            ...s.ledger,
-          ].slice(0, 40),
-        }));
+        set((s) => ({ balance: s.balance + a, bankDebt: s.bankDebt + debt }));
+        get().addLedger(`Kredi (${debt} borç)`, a);
         return true;
       },
       payBankDebt: (amount) => {
         const { balance, bankDebt } = get();
         const pay = Math.min(amount, bankDebt, balance);
         if (pay <= 0) return false;
-        set({
-          balance: balance - pay,
-          bankDebt: bankDebt - pay,
-          ledger: [
-            {
-              id: `L-${Date.now()}`,
-              label: "Banka borç ödemesi",
-              amount: -pay,
-              at: Date.now(),
-            },
-            ...get().ledger,
-          ].slice(0, 40),
-        });
+        set({ balance: balance - pay, bankDebt: bankDebt - pay });
+        get().addLedger("Banka ödemesi", -pay);
         return true;
       },
 
@@ -553,16 +499,8 @@ export const useGameStore = create<GameState>()(
           kdvDue: 0,
           incomeTaxDue: 0,
           reputation: Math.min(100, reputation + 3),
-          ledger: [
-            {
-              id: `L-${Date.now()}`,
-              label: "Vergi ödemesi (KDV + Gelir)",
-              amount: -paid,
-              at: Date.now(),
-            },
-            ...get().ledger,
-          ].slice(0, 40),
         });
+        get().addLedger("Vergi ödemesi", -paid);
         return true;
       },
 
@@ -574,22 +512,14 @@ export const useGameStore = create<GameState>()(
           kdvDue: s.kdvDue + kdv,
           incomeTaxDue: s.incomeTaxDue + gel,
           taxDue: s.taxDue + kdv + gel,
-          ledger: [
-            {
-              id: `L-${Date.now()}`,
-              label: `Vergi tahakkuk (KDV ${kdv} + GV ${gel})`,
-              amount: -(kdv + gel),
-              at: Date.now(),
-            },
-            ...s.ledger,
-          ].slice(0, 40),
         }));
+        get().addLedger(`Vergi tahakkuk KDV+GV`, -(kdv + gel));
       },
 
       addLedger: (label, amount) =>
         set((s) => ({
           ledger: [
-            { id: `L-${Date.now()}`, label, amount, at: Date.now() },
+            { id: `L-${Date.now()}-${Math.random()}`, label, amount, at: Date.now() },
             ...s.ledger,
           ].slice(0, 40),
         })),
@@ -604,16 +534,8 @@ export const useGameStore = create<GameState>()(
           terminalName: get().terminalName || "Yeni Terminal",
           reputation: Math.min(100, get().reputation + 8),
           lastPassiveTick: Date.now(),
-          ledger: [
-            {
-              id: `L-${Date.now()}`,
-              label: "Terminal inşaatı",
-              amount: -100000,
-              at: Date.now(),
-            },
-            ...get().ledger,
-          ].slice(0, 40),
         });
+        get().addLedger("Terminal inşaatı", -100000);
         return true;
       },
       buildSlot: (index, type) => {
@@ -650,14 +572,8 @@ export const useGameStore = create<GameState>()(
           if (s !== "empty") cps += SLOT_INFO[s].cps;
         });
         const gain = Math.round(cps * sec * 10) / 10;
-        if (gain > 0) {
-          set((st) => ({
-            balance: st.balance + gain,
-            lastPassiveTick: now,
-          }));
-        } else {
-          set({ lastPassiveTick: now });
-        }
+        if (gain > 0) set((st) => ({ balance: st.balance + gain, lastPassiveTick: now }));
+        else set({ lastPassiveTick: now });
       },
 
       triggerSecurityRaid: () => {
@@ -667,37 +583,150 @@ export const useGameStore = create<GameState>()(
         set({
           balance: balance - fine,
           reputation: Math.max(0, reputation - 3),
-          lastEvent: {
-            id: `raid-${Date.now()}`,
-            type: "police",
-            title: "Zabıta Baskını",
-            description: "Emanet / büfe denetimi.",
-            moneyChange: -fine,
-            reputationChange: -3,
-            emoji: "🚨",
-          },
         });
+        get().pushPhone("Zabıta", `Baskın. Ceza ${fine} ₺.`);
       },
 
       settleExpeditionProfit: (baseProfit) => {
         const bonus = 1 + get().accountingLevel * 0.05;
         const final = Math.round(baseProfit * bonus);
         get().addMoney(final);
-        set((s) => ({
-          ledger: [
-            {
-              id: `L-${Date.now()}-p`,
-              label: `Sefer geliri (muhasebe x${bonus.toFixed(2)})`,
-              amount: final,
-              at: Date.now(),
-            },
-            ...s.ledger,
-          ].slice(0, 40),
-        }));
+        get().addLedger(`Sefer geliri x${bonus.toFixed(2)}`, final);
         get().accrueTax(Math.max(0, final));
         return final;
       },
+
+      completeCitySetup: (cityId) => {
+        const city = CITIES.find((c) => c.id === cityId);
+        if (!city) return false;
+        const total = city.plotCost + city.licenseCost;
+        if (get().balance < total) return false;
+        set((s) => ({
+          balance: s.balance - total,
+          homeCityId: cityId,
+          setupDone: true,
+          terminalName: `${city.name} Terminali`,
+        }));
+        get().addLedger(`${city.name} arsa+ruhsat`, -total);
+        get().pushPhone(
+          `${city.name} Belediyesi`,
+          "Ruhsat onaylandı. Arsa tahsisi tamam. Hayırlı olsun."
+        );
+        return true;
+      },
+
+      hireDriver: (d) => {
+        if (get().balance < d.wage) return false;
+        const driver: Driver = {
+          ...d,
+          id: `drv-${Date.now()}`,
+          hiredAt: Date.now(),
+          fatigue: 0,
+        };
+        set((s) => ({
+          balance: s.balance - d.wage,
+          drivers: [...s.drivers, driver],
+        }));
+        get().addLedger(`İşe alım: ${d.name}`, -d.wage);
+        return true;
+      },
+
+      restDriver: (id) =>
+        set((s) => ({
+          drivers: s.drivers.map((d) =>
+            d.id === id ? { ...d, fatigue: Math.max(0, d.fatigue - 40) } : d
+          ),
+        })),
+
+      addFatigue: (id, amount) =>
+        set((s) => ({
+          drivers: s.drivers.map((d) =>
+            d.id === id ? { ...d, fatigue: Math.min(100, d.fatigue + amount) } : d
+          ),
+        })),
+
+      pushPhone: (from, body, type = "sms") =>
+        set((s) => ({
+          phoneMessages: [
+            {
+              id: `m-${Date.now()}`,
+              from,
+              body,
+              at: Date.now(),
+              read: false,
+              type,
+            },
+            ...s.phoneMessages,
+          ].slice(0, 30),
+        })),
+
+      markPhoneRead: () =>
+        set((s) => ({
+          phoneMessages: s.phoneMessages.map((m) => ({ ...m, read: true })),
+        })),
+
+      setPhoneOpen: (v) => set({ phoneOpen: v }),
+      setOfficeTheme: (t) => set({ officeTheme: t }),
+
+      spawnInterview: (role) => {
+        const names = [
+          "Hasan Kaptan", "Mehmet Usta", "Ali Yolcu",
+          "Kemal Direksiyon", "Osman Gece", "Veli Şüpheli",
+        ];
+        const suspicious = Math.random() > 0.65;
+        const skill = suspicious
+          ? 20 + Math.floor(Math.random() * 25)
+          : 55 + Math.floor(Math.random() * 40);
+        const wage = role === "driver" ? 800 + skill * 8 : 500 + skill * 5;
+        const good = [
+          "10 yıldır şehirler arası sürdüm.",
+          "Takografı eksiksiz tutarım.",
+          "Gece seferi sorun değil.",
+          "Muavinlik de yaptım.",
+          "Ehliyet ve SRC tamam.",
+        ];
+        const bad = [
+          "Ehliyet... evde kaldı herhalde.",
+          "Birkaç kaza oldu ama ufak.",
+          "Maaş peşin olsun.",
+          "Takograf nedir ki?",
+          "Sabah uyuyamam gece uyurum.",
+        ];
+        const pool = suspicious ? bad : good;
+        set({
+          pendingInterview: {
+            id: `int-${Date.now()}`,
+            name: names[Math.floor(Math.random() * names.length)],
+            role,
+            skill,
+            wage,
+            suspicious,
+            answers: [...pool].sort(() => Math.random() - 0.5).slice(0, 5),
+          },
+        });
+      },
+
+      finishInterview: (hire) => {
+        const c = get().pendingInterview;
+        if (!c) return;
+        if (hire) {
+          const ok = get().hireDriver({
+            name: c.name,
+            role: c.role,
+            skill: c.skill,
+            wage: c.wage,
+            suspicious: c.suspicious,
+          });
+          if (!ok) get().pushPhone("İK", "Kasa yetersiz.");
+          else if (c.suspicious)
+            get().pushPhone("İhbar", `${c.name} şüpheli referans.`);
+          else get().pushPhone("İK", `${c.name} kadroya alındı.`);
+        }
+        set({ pendingInterview: null });
+      },
+
+      setLastTicket: (t) => set({ lastTicket: t }),
     }),
-    { name: "otogar-tycoon-save-v3" }
+    { name: "otogar-tycoon-save-v4" }
   )
 );

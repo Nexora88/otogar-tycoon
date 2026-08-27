@@ -6,16 +6,25 @@ import { useGameStore } from "@/store/gameStore";
 
 export default function PlayPage() {
   const router = useRouter();
-  const startAsGuest = useGameStore((s) => s.startAsGuest);
 
   useEffect(() => {
-    startAsGuest();
+    const s = useGameStore.getState();
+    if (!s.setupDone && s.balance === 75000 && s.expeditions.length === 0) {
+      // ilk giriş — sıfırla ve kurulum
+      s.startAsGuest();
+      router.replace("/setup");
+      return;
+    }
+    if (!s.setupDone) {
+      router.replace("/setup");
+      return;
+    }
     router.replace("/dashboard");
-  }, [startAsGuest, router]);
+  }, [router]);
 
   return (
-    <div className="min-h-screen bg-[#0a0a0b] flex items-center justify-center text-zinc-400 text-sm">
-      Garaj açılıyor...
+    <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-zinc-500 text-sm">
+      Yükleniyor…
     </div>
   );
 }
