@@ -66,7 +66,7 @@ export const ROUTES: GameRoute[] = [
   {
     id: "ank-izm",
     origin: "Ankara AŞTİ",
-    destination: "İ: "İzmir Otogarı",
+    destination: "İzmir Otogarı",
     distance: 580,
     baseDuration: 7,
     region: "İç Anadolu",
