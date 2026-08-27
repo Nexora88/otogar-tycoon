@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useGameStore } from "@/store/gameStore";
 
 interface DrivingViewProps {
@@ -24,9 +24,8 @@ interface Side {
   kind: "tree" | "house" | "light" | "billboard";
 }
 
-const GEAR_MAX = [0, 28, 48, 72, 98, 120];
-const GEAR_UP = [0, 24, 42, 64, 90];
-
+const GEAR_MAX = [0, 30, 50, 75, 100, 125];
+const GEAR_UP = [0, 26, 44, 68, 92];
 const RADIO = [
   "Esnaf FM · Şiki Şiki Kaptan",
   "Kral FM · Koltuğuma Taht",
@@ -39,30 +38,46 @@ export default function DrivingView({ expeditionId }: DrivingViewProps) {
   );
 
   const [cam, setCam] = useState<CamMode>("cockpit");
+  const [ui, setUi] = useState({
+    speed: 0,
+    gear: 1,
+    fuel: 75,
+    km: 160,
+    prog: 0,
+    signal: "none" as "none" | "left" | "right",
+    wiper: false,
+    wet: 0.35,
+    radioOn: true,
+    radio: RADIO[0],
+    gearFlash: false,
+    needUp: false,
+  });
   const [lane, setLane] = useState(0);
   const [steer, setSteer] = useState(0);
-  const [speed, setSpeed] = useState(0);
-  const [want, setWant] = useState(0);
-  const [gear, setGear] = useState(1);
-  const [gearFlash, setGearFlash] = useState(false);
-  const [signal, setSignal] = useState<"none" | "left" | "right">("none");
-  const [wiper, setWiper] = useState(false);
-  const [wet, setWet] = useState(0.4);
-  const [fuel, setFuel] = useState(72);
-  const [km, setKm] = useState(155);
-  const [prog, setProg] = useState(0);
   const [cars, setCars] = useState<Car[]>([]);
   const [sides, setSides] = useState<Side[]>([]);
   const [dash, setDash] = useState(0);
   const [barrierPhase, setBarrierPhase] = useState(0);
-  const [radio, setRadio] = useState(RADIO[0]);
-  const [radioOn, setRadioOn] = useState(true);
   const [skyShift, setSkyShift] = useState(0);
-  const keys = useRef<Record<string, boolean>>({});
 
-  // Yağmur damlaları (sabit grid + anim)
+  // Fizik — ref (stale closure yok)
+  const phys = useRef({
+    speed: 0,
+    want: 0,
+    gear: 1,
+    lane: 0,
+    fuel: 75,
+    km: 160,
+    prog: 0,
+    wet: 0.35,
+    wiper: false,
+    signal: "none" as "none" | "left" | "right",
+    gas: 0, // -1 | 0 | 1
+    steer: 0, // -1 | 0 | 1
+  });
+  const keys = useRef<Record<string, boolean>>({});
   const drops = useRef(
-    Array.from({ length: 40 }).map((_, i) => ({
+    Array.from({ length: 36 }).map((_, i) => ({
       id: i,
       x: Math.random() * 100,
       y: Math.random() * 55,
@@ -70,6 +85,13 @@ export default function DrivingView({ expeditionId }: DrivingViewProps) {
     }))
   );
 
+  const setGear = useCallback((g: number) => {
+    phys.current.gear = g;
+    setUi((u) => ({ ...u, gear: g, gearFlash: true }));
+    setTimeout(() => setUi((u) => ({ ...u, gearFlash: false })), 280);
+  }, []);
+
+  // Klavye
   useEffect(() => {
     const dn = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
@@ -78,20 +100,25 @@ export default function DrivingView({ expeditionId }: DrivingViewProps) {
         setCam((c) =>
           c === "cockpit" ? "hood" : c === "hood" ? "top" : "cockpit"
         );
-      if (k === "q") setSignal((s) => (s === "left" ? "none" : "left"));
-      if (k === "e") setSignal((s) => (s === "right" ? "none" : "right"));
+      if (k === "q") {
+        phys.current.signal =
+          phys.current.signal === "left" ? "none" : "left";
+      }
+      if (k === "e") {
+        phys.current.signal =
+          phys.current.signal === "right" ? "none" : "right";
+      }
       if (e.key === " ") {
         e.preventDefault();
-        setWiper((v) => !v);
+        phys.current.wiper = !phys.current.wiper;
       }
-      if (["1", "2", "3", "4", "5"].includes(k)) {
-        setGear(Number(k));
-        setGearFlash(true);
-        setTimeout(() => setGearFlash(false), 250);
-      }
+      if (["1", "2", "3", "4", "5"].includes(k)) setGear(Number(k));
       if (k === "r") {
-        setRadioOn((v) => !v);
-        setRadio(RADIO[Math.floor(Math.random() * RADIO.length)]);
+        setUi((u) => ({
+          ...u,
+          radioOn: !u.radioOn,
+          radio: RADIO[Math.floor(Math.random() * RADIO.length)],
+        }));
       }
     };
     const up = (e: KeyboardEvent) => {
@@ -103,57 +130,65 @@ export default function DrivingView({ expeditionId }: DrivingViewProps) {
       window.removeEventListener("keydown", dn);
       window.removeEventListener("keyup", up);
     };
-  }, []);
+  }, [setGear]);
 
+  // Ana fizik döngüsü — tek sefer mount
   useEffect(() => {
     let raf = 0;
     let last = performance.now();
+    let spawnAcc = 0;
+
     const loop = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
+      const p = phys.current;
 
-      const cap = GEAR_MAX[gear];
-      if (keys.current["w"] || keys.current["arrowup"])
-        setWant((w) => Math.min(cap, w + 16 * dt));
-      else if (keys.current["s"] || keys.current["arrowdown"])
-        setWant((w) => Math.max(0, w - 26 * dt));
-      else setWant((w) => Math.max(0, w - 3.5 * dt));
+      // Klavye → gaz / direksiyon
+      let gas = p.gas;
+      let st = p.steer;
+      if (keys.current["w"] || keys.current["arrowup"]) gas = 1;
+      else if (keys.current["s"] || keys.current["arrowdown"]) gas = -1;
+      else if (p.gas === 0) gas = 0;
 
-      setSpeed((s) => s + (Math.min(want, cap) - s) * Math.min(1, 2 * dt));
+      if (keys.current["a"] || keys.current["arrowleft"]) st = -1;
+      else if (keys.current["d"] || keys.current["arrowright"]) st = 1;
+      else if (p.steer === 0) st = 0;
 
-      let dir = 0;
-      if (keys.current["a"] || keys.current["arrowleft"]) dir = -1;
-      if (keys.current["d"] || keys.current["arrowright"]) dir = 1;
-      setSteer(dir * 15);
-      setLane((L) => Math.max(-0.95, Math.min(0.95, L + dir * 1.15 * dt)));
+      // Mobil butonlar p.gas / p.steer ile basılı kalır
+      if (p.gas !== 0) gas = p.gas;
+      if (p.steer !== 0) st = p.steer;
 
-      const sp = speed;
-      setDash((d) => (d + sp * dt * 2.4) % 28);
-      setBarrierPhase((p) => (p + sp * dt * 3) % 16);
-      setSkyShift((p) => (p + sp * dt * 0.15) % 100);
+      const cap = GEAR_MAX[p.gear] ?? 30;
+      if (gas > 0) p.want = Math.min(cap, p.want + 22 * dt);
+      else if (gas < 0) p.want = Math.max(0, p.want - 35 * dt);
+      else p.want = Math.max(0, p.want - 5 * dt);
 
-      if (sp > 2) {
-        setKm((k) => Math.max(0, k - sp * dt * 0.014));
-        setFuel((f) => Math.max(0, f - sp * dt * 0.0045));
-        setProg((p) => Math.min(1, p + sp * dt * 0.00009));
+      p.speed += (Math.min(p.want, cap) - p.speed) * Math.min(1, 2.4 * dt);
+      if (p.speed < 0.15) p.speed = 0;
+
+      p.lane = Math.max(-0.95, Math.min(0.95, p.lane + st * 1.35 * dt));
+      const steerVis = st * 16;
+
+      if (p.speed > 1) {
+        p.km = Math.max(0, p.km - p.speed * dt * 0.016);
+        p.fuel = Math.max(0, p.fuel - p.speed * dt * 0.005);
+        p.prog = Math.min(1, p.prog + p.speed * dt * 0.00012);
       }
 
-      setWet((w) => {
-        let n = w + 0.025 * dt;
-        if (wiper) n -= 0.55 * dt;
-        return Math.max(0, Math.min(0.85, n));
-      });
+      p.wet = Math.max(
+        0,
+        Math.min(0.85, p.wet + 0.02 * dt - (p.wiper ? 0.6 * dt : 0))
+      );
 
-      // Damlalar
       drops.current = drops.current.map((d) => {
-        if (wiper) {
+        if (p.wiper) {
           return {
             ...d,
-            y: d.y - 55 * dt,
-            x: d.x + (d.x < 50 ? -18 : 18) * dt,
+            y: d.y - 60 * dt,
+            x: d.x + (d.x < 50 ? -20 : 20) * dt,
           };
         }
-        let y = d.y + 10 * dt * d.s;
+        let y = d.y + 11 * dt * d.s;
         let x = d.x;
         if (y > 58) {
           y = -2;
@@ -162,55 +197,102 @@ export default function DrivingView({ expeditionId }: DrivingViewProps) {
         return { ...d, x, y };
       });
 
-      setCars((prev) => {
-        let n = prev
-          .map((c) => ({ ...c, z: c.z + (0.32 + sp * 0.011) * dt * 52 }))
-          .filter((c) => c.z < 100);
-        if (Math.random() < 0.03 && n.length < 7) {
-          n.push({
-            id: Math.random(),
-            z: 5,
-            lane: [-0.55, -0.2, 0.2, 0.55][Math.floor(Math.random() * 4)],
-            color: ["#e74c3c", "#3498db", "#f1c40f", "#ecf0f1", "#2c3e50", "#e67e22"][
-              Math.floor(Math.random() * 6)
-            ],
-            w: 22 + Math.random() * 12,
-          });
-        }
-        return n;
-      });
+      const needUp =
+        p.gear < 5 &&
+        p.speed >= (GEAR_UP[p.gear] ?? 999) &&
+        p.want >= cap - 2;
 
-      setSides((prev) => {
-        let n = prev
-          .map((s) => ({ ...s, z: s.z + (0.38 + sp * 0.013) * dt * 52 }))
-          .filter((s) => s.z < 102);
-        if (Math.random() < 0.07 && n.length < 16) {
-          const kinds: Side["kind"][] = ["tree", "tree", "house", "light", "billboard"];
-          n.push({
-            id: Math.random(),
-            z: 8,
-            side: Math.random() > 0.5 ? 1 : -1,
-            kind: kinds[Math.floor(Math.random() * kinds.length)],
-          });
-        }
-        return n;
-      });
+      // UI throttle ~20fps
+      setUi((u) => ({
+        ...u,
+        speed: p.speed,
+        gear: p.gear,
+        fuel: p.fuel,
+        km: p.km,
+        prog: p.prog,
+        wet: p.wet,
+        wiper: p.wiper,
+        signal: p.signal,
+        needUp,
+      }));
+      setLane(p.lane);
+      setSteer(steerVis);
+      setDash((d) => (d + p.speed * dt * 2.5) % 28);
+      setBarrierPhase((b) => (b + p.speed * dt * 3.2) % 16);
+      setSkyShift((s) => (s + p.speed * dt * 0.2) % 120);
+
+      spawnAcc += dt;
+      if (spawnAcc > 0.35) {
+        spawnAcc = 0;
+        setCars((prev) => {
+          let n = prev
+            .map((c) => ({
+              ...c,
+              z: c.z + (0.35 + p.speed * 0.012) * 18,
+            }))
+            .filter((c) => c.z < 100);
+          if (Math.random() < 0.45 && n.length < 7) {
+            n.push({
+              id: Math.random(),
+              z: 4,
+              lane: [-0.5, -0.2, 0.2, 0.5][Math.floor(Math.random() * 4)],
+              color: ["#e74c3c", "#3498db", "#f1c40f", "#ecf0f1", "#2c3e50"][
+                Math.floor(Math.random() * 5)
+              ],
+              w: 22 + Math.random() * 12,
+            });
+          }
+          return n;
+        });
+        setSides((prev) => {
+          let n = prev
+            .map((s) => ({
+              ...s,
+              z: s.z + (0.4 + p.speed * 0.014) * 18,
+            }))
+            .filter((s) => s.z < 102);
+          if (Math.random() < 0.55 && n.length < 14) {
+            const kinds: Side["kind"][] = [
+              "tree",
+              "tree",
+              "house",
+              "light",
+              "billboard",
+            ];
+            n.push({
+              id: Math.random(),
+              z: 6,
+              side: Math.random() > 0.5 ? 1 : -1,
+              kind: kinds[Math.floor(Math.random() * kinds.length)],
+            });
+          }
+          return n;
+        });
+      }
 
       raf = requestAnimationFrame(loop);
     };
+
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [want, gear, speed, wiper]);
+  }, []);
+
+  // Mobil basınç
+  const hold = (field: "gas" | "steer", value: number) => {
+    if (field === "gas") phys.current.gas = value;
+    else phys.current.steer = value;
+  };
+  const release = (field: "gas" | "steer") => {
+    if (field === "gas") phys.current.gas = 0;
+    else phys.current.steer = 0;
+  };
 
   if (!exp || exp.status !== "departed") return null;
 
   const origin = exp.origin.split(" ")[0];
   const dest = exp.destination.split(" ")[0];
   const shift = lane * 44;
-  const needUp =
-    gear < 5 && speed >= GEAR_UP[gear] && want >= GEAR_MAX[gear] - 2;
 
-  /** z 0 uzak → 100 yakın — ufka daralan yol */
   const proj = (z: number, lat: number) => {
     const t = Math.max(0, Math.min(1, z / 100));
     const scale = 0.08 + t * t * 1.85;
@@ -220,79 +302,71 @@ export default function DrivingView({ expeditionId }: DrivingViewProps) {
   };
 
   const px = { fontFamily: "monospace", letterSpacing: "-0.02em" } as const;
-
-  // Şehir silüeti binaları (parallax)
   const buildings = [
-    { h: 28, w: 14, lit: true },
-    { h: 42, w: 18, lit: true },
-    { h: 22, w: 12, lit: false },
-    { h: 48, w: 16, lit: true },
-    { h: 34, w: 20, lit: true },
-    { h: 26, w: 11, lit: false },
-    { h: 40, w: 15, lit: true },
-    { h: 30, w: 13, lit: true },
-    { h: 36, w: 17, lit: false },
-    { h: 44, w: 14, lit: true },
+    28, 42, 22, 48, 34, 26, 40, 30, 36, 44, 24, 38,
   ];
 
   return (
     <div
-      className="fixed inset-0 z-40 overflow-hidden select-none"
-      style={{
-        imageRendering: "pixelated",
-        background: "#0a0e18",
-      }}
+      className="fixed inset-0 z-40 overflow-hidden select-none touch-none"
+      style={{ imageRendering: "pixelated", background: "#0a0e18" }}
     >
-      {/* Gökyüzü gece */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            "linear-gradient(to bottom, #0b1020 0%, #1a2744 40%, #2a3550 70%, #1e2a20 100%)",
+            "linear-gradient(to bottom, #0b1020 0%, #1a2744 45%, #1e2a20 100%)",
         }}
       />
 
-      {/* Parallax şehir — ufuk */}
+      {/* Şehir */}
       <div
         className="absolute left-0 right-0 flex items-end justify-center gap-[2px] pointer-events-none"
         style={{
-          top: "8%",
-          height: 56,
-          transform: `translateX(${-skyShift * 0.8}px)`,
-          opacity: 0.95,
+          top: "6%",
+          height: 52,
+          transform: `translateX(${-skyShift * 0.7}px)`,
         }}
       >
-        {buildings.concat(buildings).map((b, i) => (
+        {[...buildings, ...buildings].map((h, i) => (
           <div
             key={i}
             style={{
-              width: b.w,
-              height: b.h,
-              background: i % 3 === 0 ? "#1a2332" : "#243044",
-              boxShadow: "inset -3px 0 0 #0d121c",
+              width: 12 + (i % 3) * 4,
+              height: h,
+              background: i % 2 ? "#1a2332" : "#243044",
               position: "relative",
             }}
           >
-            {b.lit &&
-              Array.from({ length: 6 }).map((_, wi) => (
+            {i % 2 === 0 && (
+              <>
                 <div
-                  key={wi}
                   style={{
                     position: "absolute",
+                    left: 3,
+                    top: 6,
                     width: 2,
                     height: 2,
-                    left: 3 + (wi % 3) * 4,
-                    top: 4 + Math.floor(wi / 3) * 8,
-                    background: wi % 2 === 0 ? "#f5c542" : "#f0a020",
-                    opacity: 0.85,
+                    background: "#f5c542",
                   }}
                 />
-              ))}
+                <div
+                  style={{
+                    position: "absolute",
+                    left: 8,
+                    top: 14,
+                    width: 2,
+                    height: 2,
+                    background: "#f0a020",
+                  }}
+                />
+              </>
+            )}
           </div>
         ))}
       </div>
 
-      {/* Yol + dünya */}
+      {/* Yol */}
       <div
         className="absolute inset-0"
         style={{
@@ -303,19 +377,14 @@ export default function DrivingView({ expeditionId }: DrivingViewProps) {
           transformOrigin: "50% 100%",
         }}
       >
-        {/* Asfalt — pürüzlü piksel */}
         <div
           className="absolute left-1/2 -translate-x-1/2"
           style={{
-            top: "24%",
-            width: "160%",
-            height: "62%",
+            top: "22%",
+            width: "165%",
+            height: "65%",
             background: `
-              repeating-linear-gradient(
-                0deg,
-                transparent 0px, transparent 3px,
-                rgba(0,0,0,0.12) 3px, rgba(0,0,0,0.12) 4px
-              ),
+              repeating-linear-gradient(0deg, transparent 0px, transparent 3px, rgba(0,0,0,0.15) 3px, rgba(0,0,0,0.15) 4px),
               linear-gradient(to bottom, #4a4a52, #2a2a30)
             `,
             clipPath: "polygon(44% 0%, 56% 0%, 100% 100%, 0% 100%)",
@@ -323,20 +392,18 @@ export default function DrivingView({ expeditionId }: DrivingViewProps) {
           }}
         />
 
-        {/* Orta kesik çizgiler */}
         {Array.from({ length: 12 }).map((_, i) => {
           const z = (i * 8.5 + dash) % 100;
           const { scale, y, o } = proj(z, 0);
           return (
             <div
-              key={`d-${i}`}
+              key={`d${i}`}
               className="absolute left-1/2"
               style={{
                 top: `${y}%`,
                 width: Math.max(3, 5 * scale),
                 height: Math.max(5, 12 * scale),
                 background: "#e8e86a",
-                boxShadow: "1px 0 0 #a0a040",
                 transform: `translateX(calc(-50% + ${-shift * (z / 100)}px))`,
                 opacity: o,
               }}
@@ -344,40 +411,32 @@ export default function DrivingView({ expeditionId }: DrivingViewProps) {
           );
         })}
 
-        {/* Sarı-beyaz bariyer şeritleri (sol/sağ) */}
-        {Array.from({ length: 14 }).map((_, i) => {
-          const z = (i * 7 + barrierPhase * 2) % 100;
-          const { scale, y, o } = proj(z, 0);
-          const stripe = Math.floor((i + barrierPhase) % 2) === 0;
-          return (
-            <div key={`b-${i}`}>
-              {([-1, 1] as const).map((side) => {
-                const { x } = proj(z, side * 1.15);
-                return (
-                  <div
-                    key={side}
-                    className="absolute"
-                    style={{
-                      left: `calc(50% + ${x}px)`,
-                      top: `${y}%`,
-                      width: Math.max(4, 8 * scale),
-                      height: Math.max(6, 14 * scale),
-                      background: stripe ? "#f1c40f" : "#ecf0f1",
-                      transform: "translate(-50%, -50%)",
-                      opacity: o,
-                      boxShadow: "2px 2px 0 #0006",
-                      zIndex: Math.floor(z),
-                    }}
-                  />
-                );
-              })}
-            </div>
-          );
+        {Array.from({ length: 12 }).map((_, i) => {
+          const z = (i * 8 + barrierPhase * 2) % 100;
+          const stripe = Math.floor(i + barrierPhase) % 2 === 0;
+          return ([-1.12, 1.12] as const).map((side) => {
+            const { scale, y, x, o } = proj(z, side);
+            return (
+              <div
+                key={`b${i}${side}`}
+                className="absolute"
+                style={{
+                  left: `calc(50% + ${x}px)`,
+                  top: `${y}%`,
+                  width: Math.max(4, 8 * scale),
+                  height: Math.max(6, 12 * scale),
+                  background: stripe ? "#f1c40f" : "#ecf0f1",
+                  transform: "translate(-50%, -50%)",
+                  opacity: o,
+                  zIndex: Math.floor(z),
+                }}
+              />
+            );
+          });
         })}
 
-        {/* Kenar ağaç / ev / tabela */}
         {sides.map((s) => {
-          const { scale, y, x, o } = proj(s.z, s.side * 1.55);
+          const { scale, y, x, o } = proj(s.z, s.side * 1.5);
           const left = `calc(50% + ${x}px)`;
           if (s.kind === "tree") {
             return (
@@ -395,7 +454,7 @@ export default function DrivingView({ expeditionId }: DrivingViewProps) {
                 <div
                   style={{
                     width: 5 * scale,
-                    height: 16 * scale,
+                    height: 14 * scale,
                     margin: "0 auto",
                     background: "#5d4037",
                   }}
@@ -404,11 +463,10 @@ export default function DrivingView({ expeditionId }: DrivingViewProps) {
                   style={{
                     width: 0,
                     height: 0,
-                    borderLeft: `${13 * scale}px solid transparent`,
-                    borderRight: `${13 * scale}px solid transparent`,
-                    borderBottom: `${26 * scale}px solid #1b5e20`,
-                    marginLeft: -13 * scale,
-                    filter: "contrast(1.1)",
+                    borderLeft: `${12 * scale}px solid transparent`,
+                    borderRight: `${12 * scale}px solid transparent`,
+                    borderBottom: `${24 * scale}px solid #1b5e20`,
+                    marginLeft: -12 * scale,
                   }}
                 />
               </div>
@@ -422,79 +480,28 @@ export default function DrivingView({ expeditionId }: DrivingViewProps) {
                 style={{
                   left,
                   top: `${y}%`,
+                  width: 30 * scale,
+                  height: 24 * scale,
+                  background: "#6d4c41",
                   transform: "translate(-50%, -90%)",
                   opacity: o,
                   zIndex: Math.floor(s.z),
+                  boxShadow: `inset -3px 0 0 #4e342e`,
                 }}
               >
                 <div
                   style={{
-                    width: 32 * scale,
-                    height: 26 * scale,
-                    background: "#6d4c41",
-                    boxShadow: `inset -4px 0 0 #4e342e, ${3 * scale}px ${3 * scale}px 0 #0005`,
-                  }}
-                >
-                  <div
-                    style={{
-                      position: "absolute",
-                      left: 6 * scale,
-                      top: 8 * scale,
-                      width: 7 * scale,
-                      height: 7 * scale,
-                      background: "#ffe082",
-                    }}
-                  />
-                </div>
-                <div
-                  style={{
-                    width: 36 * scale,
-                    height: 8 * scale,
-                    marginLeft: -2 * scale,
-                    background: "#3e2723",
+                    position: "absolute",
+                    left: 5 * scale,
+                    top: 6 * scale,
+                    width: 6 * scale,
+                    height: 6 * scale,
+                    background: "#ffe082",
                   }}
                 />
               </div>
             );
           }
-          if (s.kind === "billboard") {
-            return (
-              <div
-                key={s.id}
-                className="absolute"
-                style={{
-                  left,
-                  top: `${y}%`,
-                  transform: "translate(-50%, -90%)",
-                  opacity: o,
-                  zIndex: Math.floor(s.z),
-                  fontSize: Math.max(5, 7 * scale),
-                  ...px,
-                }}
-              >
-                <div
-                  style={{
-                    background: "#c62828",
-                    color: "#fff",
-                    border: "2px solid #fff",
-                    padding: "1px 3px",
-                    textAlign: "center",
-                  }}
-                >
-                  BAKRAÇ
-                </div>
-                <div
-                  style={{
-                    width: 3 * scale,
-                    height: 14 * scale,
-                    margin: "0 auto",
-                    background: "#78909c",
-                  }}
-                />
-              </div>
-            );
-          }
-          // street light
           return (
             <div
               key={s.id}
@@ -502,32 +509,17 @@ export default function DrivingView({ expeditionId }: DrivingViewProps) {
               style={{
                 left,
                 top: `${y}%`,
+                width: 3 * scale,
+                height: 26 * scale,
+                background: "#546e7a",
                 transform: "translate(-50%, -100%)",
                 opacity: o,
                 zIndex: Math.floor(s.z),
               }}
-            >
-              <div
-                style={{
-                  width: 3 * scale,
-                  height: 28 * scale,
-                  background: "#546e7a",
-                }}
-              />
-              <div
-                style={{
-                  width: 10 * scale,
-                  height: 6 * scale,
-                  marginLeft: -3 * scale,
-                  background: "#ffecb3",
-                  boxShadow: `0 0 ${8 * scale}px #ffc107`,
-                }}
-              />
-            </div>
+            />
           );
         })}
 
-        {/* Diğer araçlar — net silüet */}
         {cars.map((c) => {
           const { scale, y, x, o } = proj(c.z, c.lane);
           return (
@@ -539,47 +531,26 @@ export default function DrivingView({ expeditionId }: DrivingViewProps) {
                 top: `${y}%`,
                 transform: "translate(-50%, -35%)",
                 opacity: o,
-                zIndex: Math.floor(c.z + 25),
+                zIndex: Math.floor(c.z + 20),
               }}
             >
               <div
                 style={{
                   width: c.w * scale,
-                  height: 28 * scale,
+                  height: 26 * scale,
                   background: c.color,
-                  boxShadow: "inset -3px 0 0 #0005, 2px 3px 0 #0004",
+                  boxShadow: "inset -3px 0 0 #0005",
                   position: "relative",
                 }}
               >
                 <div
                   style={{
                     position: "absolute",
-                    top: "10%",
+                    top: "12%",
                     left: "12%",
                     right: "12%",
-                    height: "32%",
+                    height: "30%",
                     background: "#81d4fa",
-                    boxShadow: "inset 0 -2px 0 #0277bd",
-                  }}
-                />
-                <div
-                  style={{
-                    position: "absolute",
-                    bottom: "8%",
-                    left: "8%",
-                    width: "14%",
-                    height: "14%",
-                    background: "#fff59d",
-                  }}
-                />
-                <div
-                  style={{
-                    position: "absolute",
-                    bottom: "8%",
-                    right: "8%",
-                    width: "14%",
-                    height: "14%",
-                    background: "#fff59d",
                   }}
                 />
               </div>
@@ -588,8 +559,8 @@ export default function DrivingView({ expeditionId }: DrivingViewProps) {
         })}
       </div>
 
-      {/* Yağmur damlaları */}
-      {wet > 0.08 &&
+      {/* Damlalar */}
+      {ui.wet > 0.08 &&
         drops.current.map((d) => (
           <div
             key={d.id}
@@ -599,311 +570,246 @@ export default function DrivingView({ expeditionId }: DrivingViewProps) {
               top: `${d.y}%`,
               width: 2 * d.s,
               height: 4 * d.s,
-              background: "rgba(200,220,255,0.55)",
-              opacity: wiper ? wet * 0.35 : wet * 0.9,
-              boxShadow: "0 0 2px rgba(255,255,255,0.4)",
+              background: "rgba(200,220,255,0.5)",
+              opacity: ui.wiper ? ui.wet * 0.3 : ui.wet * 0.85,
             }}
           />
         ))}
 
-      {wiper && (
-        <>
-          <div
-            className="absolute z-30 pointer-events-none"
-            style={{
-              left: "8%",
-              top: "4%",
-              width: "44%",
-              height: "48%",
-              transformOrigin: "95% 100%",
-              animation: "wipeL 0.88s ease-in-out infinite",
-            }}
-          >
-            <div className="w-full h-[2px] bg-slate-300/90 mt-[78%] shadow" />
-          </div>
-          <div
-            className="absolute z-30 pointer-events-none"
-            style={{
-              right: "8%",
-              top: "4%",
-              width: "44%",
-              height: "48%",
-              transformOrigin: "5% 100%",
-              animation: "wipeR 0.88s ease-in-out infinite",
-            }}
-          >
-            <div className="w-full h-[2px] bg-slate-300/90 mt-[78%] shadow" />
-          </div>
-        </>
-      )}
-
-      {/* Orta dikiz */}
-      {cam === "cockpit" && (
+      {ui.needUp && (
         <div
-          className="absolute top-3 left-1/2 -translate-x-1/2 z-40 border-2 border-zinc-500 bg-zinc-900 overflow-hidden"
-          style={{ width: 72, height: 28 }}
-        >
-          <div className="h-full bg-gradient-to-b from-zinc-700 to-zinc-900 flex items-end justify-center pb-0.5">
-            <div className="w-8 h-2 bg-zinc-600" />
-          </div>
-        </div>
-      )}
-
-      {needUp && (
-        <div
-          className="absolute top-[34%] left-1/2 -translate-x-1/2 z-50 px-3 py-1 bg-red-800 text-yellow-300 border-2 border-yellow-400 text-xs font-bold animate-pulse"
+          className="absolute top-[32%] left-1/2 -translate-x-1/2 z-50 px-3 py-1 bg-red-800 text-yellow-300 border-2 border-yellow-400 text-xs font-bold animate-pulse"
           style={px}
         >
-          VİTES {gear + 1}
+          VİTES {ui.gear + 1} (tuş {ui.gear + 1})
         </div>
       )}
 
-      {/* ===== KOKPİT — referans stili ===== */}
+      {/* Kokpit */}
       {cam !== "top" && (
         <div
           className="absolute bottom-0 inset-x-0 z-40 pointer-events-none"
-          style={{ height: cam === "hood" ? "16%" : "46%" }}
+          style={{ height: cam === "hood" ? "14%" : "42%" }}
         >
           {cam === "cockpit" && (
             <>
-              {/* Göğüs — koyu piksel */}
               <div
                 className="absolute bottom-0 inset-x-0 h-full"
                 style={{
-                  background: "linear-gradient(to top, #1a1c22 0%, #3a3e48 50%, #2a2e36 100%)",
+                  background:
+                    "linear-gradient(to top, #1a1c22, #3a3e48 55%, #2a2e36)",
                   clipPath:
-                    "polygon(0% 40%, 4% 12%, 10% 0%, 90% 0%, 96% 12%, 100% 40%, 100% 100%, 0% 100%)",
-                  boxShadow: "inset 0 6px 0 #4a4e58",
+                    "polygon(0% 38%, 5% 10%, 12% 0%, 88% 0%, 95% 10%, 100% 38%, 100% 100%, 0% 100%)",
                 }}
               />
-
-              {/* Ahşap direksiyon göbeği bandı hissi */}
               <div
-                className="absolute bottom-[6%] left-1/2 -translate-x-1/2"
+                className="absolute bottom-[4%] left-1/2 -translate-x-1/2"
                 style={{ transform: `rotate(${steer}deg)` }}
               >
                 <div
-                  className="relative"
                   style={{
-                    width: 168,
-                    height: 168,
+                    width: 150,
+                    height: 150,
                     borderRadius: "50%",
-                    border: "14px solid #5d4037",
-                    boxShadow:
-                      "inset 0 0 0 6px #3e2723, 0 0 0 3px #2c2c2c, 4px 8px 0 #0005",
+                    border: "12px solid #5d4037",
                     background: "#2c3038",
+                    boxShadow: "inset 0 0 0 5px #3e2723",
+                    position: "relative",
                   }}
                 >
                   <div
-                    className="absolute inset-3 rounded-full"
-                    style={{ border: "2px solid #4a4e56" }}
-                  />
-                  {/* Kollar */}
-                  <div
                     className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
                     style={{
-                      width: "68%",
-                      height: 10,
-                      background: "#4e342e",
-                      borderRadius: 2,
-                    }}
-                  />
-                  <div
-                    className="absolute top-1/2 left-1/2 -translate-x-1/2"
-                    style={{
-                      width: 10,
-                      height: "40%",
-                      background: "#4e342e",
-                      marginTop: "-5%",
-                      borderRadius: 2,
-                    }}
-                  />
-                  {/* Amblem */}
-                  <div
-                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center"
-                    style={{
-                      width: 36,
-                      height: 36,
+                      width: 32,
+                      height: 32,
                       borderRadius: "50%",
-                      background: "#1a1a1a",
+                      background: "#111",
                       border: "2px solid #c9a227",
                       color: "#c9a227",
-                      fontSize: 9,
+                      fontSize: 10,
                       fontWeight: 900,
-                      ...px,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
                     }}
                   >
                     ★
                   </div>
-                  {/* Sol el */}
                   <div
                     style={{
                       position: "absolute",
-                      left: 6,
-                      top: "38%",
-                      width: 28,
-                      height: 36,
+                      left: 4,
+                      top: "36%",
+                      width: 24,
+                      height: 32,
                       background: "#d4a574",
-                      borderRadius: 6,
-                      boxShadow: "inset -4px 0 0 #b8956a",
-                      transform: `rotate(${-8 - steer * 0.2}deg)`,
+                      borderRadius: 5,
                     }}
                   />
-                  {/* Sağ el */}
                   <div
                     style={{
                       position: "absolute",
-                      right: 6,
-                      top: "38%",
-                      width: 28,
-                      height: 36,
+                      right: 4,
+                      top: "36%",
+                      width: 24,
+                      height: 32,
                       background: "#d4a574",
-                      borderRadius: 6,
-                      boxShadow: "inset 4px 0 0 #b8956a",
-                      transform: `rotate(${8 - steer * 0.2}deg)`,
+                      borderRadius: 5,
                     }}
                   />
                 </div>
               </div>
-
-              {/* Sol kadran grubu */}
               <div
-                className="absolute bottom-[42%] left-[10%] flex gap-2 items-end"
+                className="absolute bottom-[40%] left-[8%]"
+                style={{
+                  ...px,
+                  width: 44,
+                  height: 44,
+                  borderRadius: "50%",
+                  background: "#0a0a0a",
+                  border: "3px solid #555",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <span style={{ color: "#e8e86a", fontSize: 15 }}>
+                  {Math.round(ui.speed)}
+                </span>
+                <span style={{ color: "#666", fontSize: 7 }}>km/s</span>
+              </div>
+              <div
+                className="absolute bottom-[40%] left-[24%]"
+                style={{
+                  ...px,
+                  background: ui.gearFlash ? "#f1c40f" : "#111",
+                  border: "2px solid #666",
+                  padding: "3px 7px",
+                  color: ui.gearFlash ? "#000" : "#f1c40f",
+                }}
+              >
+                <div style={{ fontSize: 7 }}>V</div>
+                <div style={{ fontSize: 18, fontWeight: 700 }}>{ui.gear}</div>
+              </div>
+              <div
+                className="absolute bottom-3 left-2 text-[10px] text-zinc-400"
                 style={px}
               >
-                <div
-                  style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: "50%",
-                    background: "#0a0a0a",
-                    border: "3px solid #5a5a5a",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    boxShadow: "inset 0 0 12px #000",
-                  }}
-                >
-                  <span style={{ color: "#e8e86a", fontSize: 16, lineHeight: 1 }}>
-                    {Math.round(speed)}
-                  </span>
-                  <span style={{ color: "#666", fontSize: 7 }}>km/s</span>
-                </div>
-              </div>
-
-              {/* Vites kutusu */}
-              <div
-                className="absolute bottom-[42%] left-[28%]"
-                style={{
-                  ...px,
-                  background: gearFlash ? "#f1c40f" : "#111",
-                  border: "2px solid #666",
-                  padding: "4px 8px",
-                  color: gearFlash ? "#000" : "#f1c40f",
-                }}
-              >
-                <div style={{ fontSize: 7, color: gearFlash ? "#333" : "#666" }}>
-                  VİTES
-                </div>
-                <div style={{ fontSize: 20, fontWeight: 700, lineHeight: 1 }}>
-                  {gear}
-                </div>
-              </div>
-
-              {/* Radyo */}
-              <div
-                className="absolute bottom-[58%] right-[12%]"
-                style={{
-                  ...px,
-                  width: 120,
-                  background: "#111",
-                  border: "2px solid #555",
-                  padding: 4,
-                  fontSize: 8,
-                }}
-              >
-                <div style={{ color: "#888" }}>TEYP R</div>
-                <div style={{ color: radioOn ? "#2ecc71" : "#555", marginTop: 2 }}>
-                  {radioOn ? `♪ ${radio.slice(0, 22)}` : "KAPALI"}
-                </div>
-              </div>
-
-              {/* Nazar */}
-              <div className="absolute top-1 left-1/2 -translate-x-1/2 text-xl z-50">
-                🧿
-              </div>
-
-              {/* Mazot bar */}
-              <div
-                className="absolute bottom-4 left-3"
-                style={{ ...px, fontSize: 10, color: "#aaa" }}
-              >
                 MAZOT{" "}
-                <span style={{ color: fuel < 20 ? "#e74c3c" : "#2ecc71" }}>
-                  %{Math.round(fuel)}
+                <span
+                  style={{ color: ui.fuel < 20 ? "#e74c3c" : "#2ecc71" }}
+                >
+                  %{Math.round(ui.fuel)}
                 </span>
-              </div>
-
-              <div className="absolute bottom-4 right-3 flex gap-1">
-                <div
-                  style={{
-                    width: 22,
-                    height: 22,
-                    border: "2px solid #666",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 10,
-                    background: signal === "left" ? "#f1c40f" : "transparent",
-                    color: signal === "left" ? "#000" : "#666",
-                  }}
-                >
-                  ◀
-                </div>
-                <div
-                  style={{
-                    width: 22,
-                    height: 22,
-                    border: "2px solid #666",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 10,
-                    background: signal === "right" ? "#f1c40f" : "transparent",
-                    color: signal === "right" ? "#000" : "#666",
-                  }}
-                >
-                  ▶
-                </div>
               </div>
             </>
           )}
         </div>
       )}
 
+      {/* HUD */}
       <div
-        className="absolute top-2 left-2 z-50 text-white bg-black/80 border border-zinc-600 px-2 py-1"
-        style={{ ...px, fontSize: 9 }}
+        className="absolute top-1 left-1 z-50 text-white bg-black/85 border border-zinc-600 px-2 py-0.5 text-[8px] sm:text-[9px]"
+        style={px}
       >
-        WASD · 1-5 vites · R · C · Space · Q/E
+        W gaz · 1-5 vites · R radyo
       </div>
       <div
-        className="absolute top-2 right-2 z-50 bg-black/90 border-2 border-zinc-600 p-2"
-        style={{ ...px, fontSize: 10, width: 130 }}
+        className="absolute top-1 right-1 z-50 bg-black/90 border border-zinc-600 p-1.5 text-[9px] w-28 sm:w-32"
+        style={px}
       >
-        <div style={{ color: "#888" }}>ROTA</div>
-        <div style={{ color: "#f1c40f" }}>
+        <div className="text-amber-400">
           {origin}→{dest}
         </div>
-        <div className="mt-1 h-1 bg-zinc-800">
+        <div className="h-1 bg-zinc-800 mt-1">
           <div
             className="h-full bg-emerald-500"
-            style={{ width: `${prog * 100}%` }}
+            style={{ width: `${ui.prog * 100}%` }}
           />
         </div>
-        <div style={{ color: "#888", marginTop: 2 }}>
-          {Math.round(km)}km · V{gear}
+        <div className="text-zinc-500">
+          {Math.round(ui.km)}km V{ui.gear}
+        </div>
+      </div>
+
+      {/* ===== MOBİL KONTROL ===== */}
+      <div className="absolute bottom-0 inset-x-0 z-50 flex justify-between items-end p-3 pb-4 pointer-events-none md:pb-6">
+        <div className="flex gap-2 pointer-events-auto">
+          <button
+            type="button"
+            className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-black/70 border-2 border-zinc-500 text-white text-xl active:bg-amber-600/80"
+            onTouchStart={(e) => {
+              e.preventDefault();
+              hold("steer", -1);
+            }}
+            onTouchEnd={() => release("steer")}
+            onMouseDown={() => hold("steer", -1)}
+            onMouseUp={() => release("steer")}
+            onMouseLeave={() => release("steer")}
+          >
+            ◀
+          </button>
+          <button
+            type="button"
+            className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-black/70 border-2 border-zinc-500 text-white text-xl active:bg-amber-600/80"
+            onTouchStart={(e) => {
+              e.preventDefault();
+              hold("steer", 1);
+            }}
+            onTouchEnd={() => release("steer")}
+            onMouseDown={() => hold("steer", 1)}
+            onMouseUp={() => release("steer")}
+            onMouseLeave={() => release("steer")}
+          >
+            ▶
+          </button>
+        </div>
+        <div className="flex flex-col gap-2 pointer-events-auto">
+          <div className="flex gap-1 justify-end">
+            {[1, 2, 3, 4, 5].map((g) => (
+              <button
+                key={g}
+                type="button"
+                onClick={() => setGear(g)}
+                className={`w-8 h-8 rounded text-xs font-bold border ${
+                  ui.gear === g
+                    ? "bg-amber-500 text-black border-amber-300"
+                    : "bg-black/70 text-zinc-300 border-zinc-600"
+                }`}
+              >
+                {g}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="w-20 h-16 sm:w-24 sm:h-20 rounded-xl bg-emerald-800/90 border-2 border-emerald-500 text-white font-bold text-sm active:bg-emerald-500 active:text-black"
+            onTouchStart={(e) => {
+              e.preventDefault();
+              hold("gas", 1);
+            }}
+            onTouchEnd={() => release("gas")}
+            onMouseDown={() => hold("gas", 1)}
+            onMouseUp={() => release("gas")}
+            onMouseLeave={() => release("gas")}
+          >
+            GAZ
+          </button>
+          <button
+            type="button"
+            className="w-20 h-10 rounded-lg bg-black/70 border border-zinc-500 text-zinc-300 text-xs"
+            onTouchStart={(e) => {
+              e.preventDefault();
+              hold("gas", -1);
+            }}
+            onTouchEnd={() => release("gas")}
+            onMouseDown={() => hold("gas", -1)}
+            onMouseUp={() => release("gas")}
+            onMouseLeave={() => release("gas")}
+          >
+            FREN
+          </button>
         </div>
       </div>
 
@@ -929,4 +835,4 @@ export default function DrivingView({ expeditionId }: DrivingViewProps) {
       `}</style>
     </div>
   );
-}
+      }
