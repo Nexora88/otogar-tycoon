@@ -12,6 +12,5 @@ export const CITY_PLATE: Record<string, string> = {
 export function makePlate(cityId: string | null, model: string): string {
   const code = (cityId && CITY_PLATE[cityId]) || "34";
   const mid = model.replace(/\s/g, "").slice(0, 3).toUpperCase() || "OTB";
-  const num = String(10 + Math.floor(Math.random() * 89));
-  return `${code} ${mid} ${num}`;
+  return `${code} ${mid} ${10 + Math.floor(Math.random() * 89)}`;
 }

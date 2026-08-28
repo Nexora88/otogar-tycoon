@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { makePlate } from "@/lib/plates";
+import {
+  getGlobalGameClock,
+  REAL_MS_PER_GAME_DAY,
+} from "@/lib/gameTime";
 
 export type BusColor = "blue" | "red" | "green" | "black" | "white" | "orange";
 export type Catering = "water" | "snack" | "vip";
@@ -25,6 +29,7 @@ export interface GameBus {
   plate: string;
   sticker?: string | null;
   impoundedUntil?: number | null;
+  repairingUntil?: number | null;
 }
 
 export interface Passenger {
@@ -180,24 +185,9 @@ export const CATERING_INFO: Record<
   Catering,
   { label: string; perSeat: number; repMod: number; desc: string }
 > = {
-  water: {
-    label: "Ucuz İkram (musluk + bisküvi)",
-    perSeat: 3,
-    repMod: -2,
-    desc: "Ucuz, şikâyet",
-  },
-  snack: {
-    label: "Standart (kek + kola)",
-    perSeat: 18,
-    repMod: 0,
-    desc: "Denge",
-  },
-  vip: {
-    label: "Lüks (çay + pişmaniye)",
-    perSeat: 55,
-    repMod: 3,
-    desc: "Pahalı, itibar+",
-  },
+  water: { label: "Ucuz İkram", perSeat: 3, repMod: -2, desc: "Musluk + bisküvi" },
+  snack: { label: "Standart", perSeat: 18, repMod: 0, desc: "Kek + kola" },
+  vip: { label: "Lüks", perSeat: 55, repMod: 3, desc: "Çay + pişmaniye" },
 };
 
 export const STICKERS = [
@@ -239,7 +229,7 @@ export const MARKET_BUSES: BusListing[] = [
   { model: "Neoplan", name: "Neoplan Cityliner", seatCount: 56, price: 410000, fuelUse: 18, muavinCost: 1100, engineHealth: 96, color: "green" },
 ];
 
-export const REAL_MS_PER_GAME_DAY = 90_000;
+export { REAL_MS_PER_GAME_DAY };
 
 export interface GameState {
   isGuest: boolean;
@@ -297,6 +287,9 @@ export interface GameState {
   meetingTopic: string;
   bayramActive: boolean;
   rivalWeak: boolean;
+  guestDayLimit: number;
+  forceRegister: boolean;
+  paperNotify: "morning" | "evening" | null;
 
   startAsGuest: () => void;
   setCompanyName: (n: string) => void;
@@ -313,6 +306,7 @@ export interface GameState {
   clearLastEvent: () => void;
   setHasPlayedOnce: () => void;
   resetGame: () => void;
+  resetGameFull: () => void;
   upgradeAccounting: () => boolean;
   upgradeCustomerService: () => boolean;
   rentDesk: () => boolean;
@@ -364,6 +358,9 @@ export interface GameState {
   rollRoadEvent: (exp: Expedition) => RoadEvent | null;
   crierBonus: () => number;
   priceCapMultiplier: () => number;
+  clearPaperNotify: () => void;
+  startBusRepair: (busId: string) => boolean;
+  canUseBus: (busId: string) => boolean;
 }
 
 const startingBus: GameBus = {
@@ -378,33 +375,25 @@ const startingBus: GameBus = {
   plate: "34 OTB 01",
   sticker: null,
   impoundedUntil: null,
+  repairingUntil: null,
 };
 
 const NAMES = [
-  "Ahmet Yılmaz",
-  "Ayşe Demir",
-  "Mehmet Kaya",
-  "Fatma Çelik",
-  "Mustafa Şahin",
-  "Elif Arslan",
-  "Hüseyin Koç",
-  "Zeynep Aydın",
-  "İbrahim Öz",
-  "Merve Yıldız",
+  "Ahmet Yılmaz", "Ayşe Demir", "Mehmet Kaya", "Fatma Çelik", "Mustafa Şahin",
+  "Elif Arslan", "Hüseyin Koç", "Zeynep Aydın", "İbrahim Öz", "Merve Yıldız",
 ];
 
 export function generatePassengers(count: number): Passenger[] {
   return Array.from({ length: count }).map((_, i) => ({
     id: `p-${Date.now()}-${i}`,
     name: NAMES[Math.floor(Math.random() * NAMES.length)],
-    mood:
-      Math.random() > 0.8 ? "angry" : Math.random() > 0.4 ? "normal" : "happy",
+    mood: Math.random() > 0.8 ? "angry" : Math.random() > 0.4 ? "normal" : "happy",
   }));
 }
 
 const CRIMINAL_NOTES = [
   "Temiz kayıt.",
-  "İzmit virajında yan yatırdı; pişmaniye iddiası.",
+  "İzmit virajında yan yatırdı.",
   "Takograf oynamış.",
   "Üç firma değiştirmiş.",
   "Dürüst, SRC tamam.",
@@ -416,6 +405,7 @@ const emptySlots = (): TerminalSlot[] =>
 const MAX_LOAN = 50000;
 
 function createInitialState() {
+  const clock = getGlobalGameClock();
   return {
     isGuest: true,
     companyName: "Misafir Şirket",
@@ -440,9 +430,9 @@ function createInitialState() {
     terminalName: "",
     terminalSlots: emptySlots(),
     terminalBuilt: false,
-    gameYear: 1987,
-    gameDay: 1,
-    gameHour: 6,
+    gameYear: clock.gameYear,
+    gameDay: clock.gameDay,
+    gameHour: clock.gameHour,
     lastTimeTick: Date.now(),
     lastPassiveTick: Date.now(),
     securityRisk: 0,
@@ -461,7 +451,7 @@ function createInitialState() {
     morningPaper: [] as NewsItem[],
     eveningPaper: [] as NewsItem[],
     paperEdition: null as "morning" | "evening" | null,
-    officeNotes: "— Not defteri —\nSabah: şoför kontrol.\n",
+    officeNotes: "— Not —\nŞoförleri kontrol et.\n",
     mafiaDebtDue: false,
     mafiaLastPayDay: 0,
     crierLevel: 0,
@@ -472,6 +462,9 @@ function createInitialState() {
     meetingTopic: "",
     bayramActive: false,
     rivalWeak: false,
+    guestDayLimit: 5,
+    forceRegister: false,
+    paperNotify: null as "morning" | "evening" | null,
   };
 }
 
@@ -483,7 +476,7 @@ export const useGameStore = create<GameState>()(
       startAsGuest: () =>
         set({ ...createInitialState(), buses: [{ ...startingBus }] }),
 
-      setCompanyName: (n) => set({ companyName: n }),
+      setCompanyName: (n) => set({ companyName: n, isGuest: false }),
 
       addMoney: (a) => set((s) => ({ balance: s.balance + a })),
 
@@ -519,11 +512,9 @@ export const useGameStore = create<GameState>()(
           plate: makePlate(get().homeCityId, l.model),
           sticker: null,
           impoundedUntil: null,
+          repairingUntil: null,
         };
-        set((s) => ({
-          balance: s.balance - l.price,
-          buses: [...s.buses, bus],
-        }));
+        set((s) => ({ balance: s.balance - l.price, buses: [...s.buses, bus] }));
         get().addLedger(`Otobüs: ${l.name}`, -l.price);
         return true;
       },
@@ -542,8 +533,7 @@ export const useGameStore = create<GameState>()(
         return true;
       },
 
-      addExpedition: (e) =>
-        set((s) => ({ expeditions: [e, ...s.expeditions] })),
+      addExpedition: (e) => set((s) => ({ expeditions: [e, ...s.expeditions] })),
 
       updateExpedition: (id, d) =>
         set((s) => ({
@@ -569,6 +559,7 @@ export const useGameStore = create<GameState>()(
       setHasPlayedOnce: () => set({ hasPlayedOnce: true }),
 
       resetGame: () => get().startAsGuest(),
+      resetGameFull: () => get().startAsGuest(),
 
       upgradeAccounting: () => {
         const { balance, accountingLevel } = get();
@@ -600,7 +591,7 @@ export const useGameStore = create<GameState>()(
         return true;
       },
 
-      spawnCustomer: () => {
+      spawnCustomer: () =>
         set({
           pendingCustomer: {
             id: `c-${Date.now()}`,
@@ -609,37 +600,30 @@ export const useGameStore = create<GameState>()(
             mood: "angry",
             type: "lost_item",
           },
-        });
-      },
+        }),
 
       resolveCustomer: (choice) => {
-        const {
-          pendingCustomer,
-          reputation,
-          balance,
-          customerServiceLevel,
-        } = get();
-        if (!pendingCustomer) return;
+        if (!get().pendingCustomer) return;
         if (choice === "dismiss") {
-          set({
+          set((s) => ({
             pendingCustomer: null,
-            reputation: Math.max(0, reputation - 5),
-          });
+            reputation: Math.max(0, s.reputation - 5),
+          }));
         } else if (choice === "help") {
-          set({
+          set((s) => ({
             pendingCustomer: null,
             reputation: Math.min(
               100,
-              reputation + 2 + customerServiceLevel
+              s.reputation + 2 + s.customerServiceLevel
             ),
-          });
+          }));
         } else {
-          const pay = 1500 + customerServiceLevel * 200;
-          set({
+          const pay = 1500 + get().customerServiceLevel * 200;
+          set((s) => ({
             pendingCustomer: null,
-            balance: balance - pay,
-            reputation: Math.min(100, reputation + 6),
-          });
+            balance: s.balance - pay,
+            reputation: Math.min(100, s.reputation + 6),
+          }));
           get().addLedger("Tazminat", -pay);
         }
       },
@@ -724,10 +708,7 @@ export const useGameStore = create<GameState>()(
         set((s) => ({
           balance: s.balance - info.cost,
           terminalSlots: next,
-          reputation: Math.min(
-            100,
-            Math.max(0, s.reputation + info.repMod)
-          ),
+          reputation: Math.min(100, Math.max(0, s.reputation + info.repMod)),
           securityRisk: Math.min(
             100,
             next.reduce(
@@ -768,8 +749,8 @@ export const useGameStore = create<GameState>()(
           balance: balance - fine,
           reputation: Math.max(0, reputation - 3),
         });
-        get().pushPhone("Zabıta", `Baskın. Ceza ${fine} ₺.`);
-        get().addLedger("Zabıta baskını", -fine);
+        get().pushPhone("Zabıta", `Baskın! Ceza ${fine} ₺.`);
+        get().addLedger("Zabıta", -fine);
       },
 
       settleExpeditionProfit: (base) => {
@@ -862,7 +843,6 @@ export const useGameStore = create<GameState>()(
         })),
 
       setPhoneOpen: (v) => set({ phoneOpen: v }),
-
       setOfficeTheme: (t) => set({ officeTheme: t }),
 
       spawnInterview: (role) => {
@@ -951,65 +931,40 @@ export const useGameStore = create<GameState>()(
       setLastTicket: (t) => set({ lastTicket: t }),
 
       tickGameTime: () => {
-        const now = Date.now();
-        const { lastTimeTick, gameHour, gameDay, gameYear } = get();
-        const hoursPass = Math.floor((now - lastTimeTick) / 3750);
-        if (hoursPass < 1) return;
+        const prevH = get().gameHour;
+        const prevD = get().gameDay;
+        const clock = getGlobalGameClock();
+        set({
+          gameDay: clock.gameDay,
+          gameHour: clock.gameHour,
+          gameYear: clock.gameYear,
+          lastTimeTick: Date.now(),
+        });
 
-        let h = gameHour + hoursPass;
-        let d = gameDay;
-        let y = gameYear;
-        const crossedEvening = gameHour < 18 && h >= 18;
-
-        while (h >= 24) {
-          h -= 24;
-          d += 1;
-          const bayram = d % 7 === 0;
-          set({ bayramActive: bayram });
-          if (bayram) {
-            get().pushPhone("Hakiki Peron", "BAYRAM TRAFİĞİ başladı!");
-          }
+        if (clock.gameDay !== prevD) {
           get().generateDailyNews();
-          if (d % 7 === 1) get().mafiaVisit();
-          if (Math.random() > 0.85) get().spawnInspector();
+          set({ paperNotify: "morning" });
+          if (get().isGuest && get().setupDone) {
+            set({ forceRegister: true });
+          }
+          if (clock.gameDay % 7 === 1) get().mafiaVisit();
+          if (Math.random() > 0.86) get().spawnInspector();
+          set({ bayramActive: clock.gameDay % 7 === 0 });
         }
 
-        if (crossedEvening) {
+        if (prevH < 18 && clock.gameHour >= 18) {
           const evening: NewsItem[] = [
             {
-              id: `e1-${d}`,
-              headline: "AKŞAM: Peronlar sakin, hesaplar konuşuluyor",
-              body: "Gündüz seferlerinin bilançosu yazıhanelerde.",
+              id: `e1-${clock.gameDay}`,
+              headline: "AKŞAM: Peronlar yavaşlıyor",
+              body: "Gündüz seferleri kapanırken hesaplar konuşuluyor.",
               kind: "economy",
               aboutPlayer: false,
-              day: d,
+              day: clock.gameDay,
             },
           ];
-          if (get().lastEvent?.type === "accident") {
-            evening.push({
-              id: `e-acc-${d}`,
-              headline: "Akşam: Gündüz kazası dosyası büyüyor",
-              body: "Mağdur yakınları açıklama bekliyor.",
-              kind: "crash",
-              aboutPlayer: true,
-              day: d,
-            });
-          }
-          set({ eveningPaper: evening });
+          set({ eveningPaper: evening, paperNotify: "evening" });
         }
-
-        if (d > 360) {
-          d = 1;
-          y += 1;
-        }
-
-        set({
-          gameHour: h % 24,
-          gameDay: d,
-          gameYear: y,
-          lastTimeTick: now,
-          ağaEnergy: Math.max(0, get().ağaEnergy - hoursPass * 0.4),
-        });
       },
 
       generateDailyNews: () => {
@@ -1017,18 +972,18 @@ export const useGameStore = create<GameState>()(
         const morning: NewsItem[] = [
           {
             id: `m1-${day}`,
-            headline: "SABAHTAN: Yollarda denetim sıklaştı",
-            body: "EDS ve jandarma artabilir.",
+            headline: "SABAHTAN: EDS noktaları çoğaldı",
+            body: "Bolu ve Keşan çıkışında flaş. Kaptanlar dikkat.",
             kind: "economy",
             aboutPlayer: false,
             day,
           },
         ];
-        if (Math.random() > 0.4) {
+        if (Math.random() > 0.45) {
           morning.push({
             id: `m2-${day}`,
-            headline: "Ali Otobüs zor durumda",
-            body: "Rakip zayıf; fiyat manevrası mümkün.",
+            headline: "Ali Otobüs sarsılıyor",
+            body: "Rakip zayıf — fiyat manevrası mümkün.",
             kind: "rival",
             aboutPlayer: false,
             day,
@@ -1038,14 +993,14 @@ export const useGameStore = create<GameState>()(
         if (get().hasPlayedOnce) {
           morning.push({
             id: `m3-${day}`,
-            headline: `${get().companyName}: ${get().terminalName || "Terminal"} konuşuluyor`,
-            body: "Yerel esnaf Nexora bilet dedikodusunda.",
+            headline: `${get().companyName} konuşuluyor`,
+            body: `${get().terminalName || "Terminal"} peronunda hareket var.`,
             kind: "player",
             aboutPlayer: true,
             day,
           });
         }
-        set({ morningPaper: morning, newspaperSeenDay: day - 1 });
+        set({ morningPaper: morning });
       },
 
       openNewspaper: () =>
@@ -1054,10 +1009,10 @@ export const useGameStore = create<GameState>()(
           paperEdition: "morning",
           newspaper: get().morningPaper,
           newspaperSeenDay: get().gameDay,
+          paperNotify: null,
         }),
 
-      closeNewspaper: () =>
-        set({ newspaperOpen: false, paperEdition: null }),
+      closeNewspaper: () => set({ newspaperOpen: false, paperEdition: null }),
 
       openPaperEdition: (ed) =>
         set({
@@ -1066,15 +1021,23 @@ export const useGameStore = create<GameState>()(
           newspaper:
             ed === "morning" ? get().morningPaper : get().eveningPaper,
           newspaperSeenDay: get().gameDay,
+          paperNotify: null,
         }),
+
+      clearPaperNotify: () => set({ paperNotify: null }),
 
       setOfficeNotes: (t) => set({ officeNotes: t.slice(0, 2000) }),
 
       mafiaVisit: () => {
+        const lines = [
+          "Ağa, haftalık ₺8.000. Bu peronun sükûneti.",
+          "Çocuklar kapıda. Ya çay parası, ya gece uzun.",
+          "Komşu dinlemedi — sen akıllısındır.",
+        ];
         set({ mafiaDebtDue: true });
         get().pushPhone(
           "İsimsiz",
-          "Haftalık haraç ₺8.000 — yoksa gece otobüsler üşür."
+          lines[Math.floor(Math.random() * lines.length)]
         );
       },
 
@@ -1085,36 +1048,47 @@ export const useGameStore = create<GameState>()(
           mafiaDebtDue: false,
           mafiaLastPayDay: s.gameDay,
         }));
-        get().addLedger("Haftalık koruma", -8000);
+        get().addLedger("Koruma", -8000);
         get().pushPhone("İsimsiz", "Akıllı adamsın ağa.");
         return true;
       },
 
       refuseMafia: () => {
         set({ mafiaDebtDue: false });
-        const list = get().buses;
-        if (list.length === 0) return;
+        const list = get().buses.filter(
+          (b) => !b.repairingUntil || b.repairingUntil < Date.now()
+        );
+        if (list.length === 0) {
+          get().pushPhone("İsimsiz", "Yanacak araba kalmamış…");
+          return;
+        }
         const target = list[Math.floor(Math.random() * list.length)];
+        const bill = 12000;
         const fireNews: NewsItem = {
           id: `fire-${Date.now()}`,
-          headline: `KUNDAK: ${get().terminalName || "Firma"} filosunda yangın!`,
-          body: "Gece otoparkta alev. Emniyet bilinçli kundak diyor.",
+          headline: `KUNDAK: ${target.plate} alev aldı!`,
+          body: "Gece otopark yangını. Araç tamire çekildi.",
           kind: "crash",
           aboutPlayer: true,
           day: get().gameDay,
         };
         set((s) => ({
-          balance: Math.max(0, s.balance - 25000),
-          reputation: Math.max(0, s.reputation - 6),
+          balance: Math.max(500, s.balance - bill),
+          reputation: Math.max(0, s.reputation - 7),
           buses: s.buses.map((b) =>
             b.id === target.id
-              ? { ...b, engineHealth: Math.max(15, b.engineHealth - 35) }
+              ? {
+                  ...b,
+                  engineHealth: Math.max(5, b.engineHealth - 55),
+                  repairingUntil: Date.now() + 2 * REAL_MS_PER_GAME_DAY,
+                }
               : b
           ),
           eveningPaper: [fireNews, ...s.eveningPaper].slice(0, 8),
+          paperNotify: "evening",
         }));
-        get().addLedger(`Kundak: ${target.name}`, -25000);
-        get().pushPhone("Gece nöbeti", `${target.plate} kundaklandı.`);
+        get().addLedger(`Kundak: ${target.name}`, -bill);
+        get().pushPhone("Nöbet", `${target.plate} kundaklandı. Tamirde.`);
       },
 
       upgradeCrier: () => {
@@ -1122,10 +1096,7 @@ export const useGameStore = create<GameState>()(
         if (lv >= 5) return false;
         const cost = 3000 + lv * 4000;
         if (get().balance < cost) return false;
-        set((s) => ({
-          balance: s.balance - cost,
-          crierLevel: s.crierLevel + 1,
-        }));
+        set((s) => ({ balance: s.balance - cost, crierLevel: lv + 1 }));
         get().addLedger(`Çığırtkan sv.${lv + 1}`, -cost);
         return true;
       },
@@ -1140,10 +1111,7 @@ export const useGameStore = create<GameState>()(
 
       buyTeaStock: () => {
         if (get().balance < 800) return false;
-        set((s) => ({
-          balance: s.balance - 800,
-          teaStock: s.teaStock + 8,
-        }));
+        set((s) => ({ balance: s.balance - 800, teaStock: s.teaStock + 8 }));
         get().addLedger("Çay seti", -800);
         return true;
       },
@@ -1153,8 +1121,8 @@ export const useGameStore = create<GameState>()(
         set({
           inspector: {
             id: `ins-${Date.now()}`,
-            title: "Maliye / Çalışma Denetmeni",
-            body: "Sigorta ve vergi dosyası açıldı.",
+            title: "Müfettiş kapıda",
+            body: "Evrak, sigorta, korsan yolcu… Konuşalım ağa.",
             fine: 15000,
             bribe: 2000,
           },
@@ -1228,63 +1196,132 @@ export const useGameStore = create<GameState>()(
         const drv = get().drivers.find((d) => d.id === exp.driverId);
         const fatigue = drv?.fatigue ?? 30;
         const skill = drv?.skill ?? 50;
-        let pAccident = 0.04 + fatigue / 500 - skill / 800;
-        const pEds = 0.03;
-        const pPolice = 0.05;
-        const pJandarma = exp.smuggle ? 0.12 : 0.02;
-        if ((drv?.reliability ?? 50) < 40) pAccident += 0.03;
+
+        let pEds = 0.11;
+        let pPolice = 0.14;
+        let pAccident = 0.05 + fatigue / 400 - skill / 900;
+        const pJandarma = exp.smuggle ? 0.14 : 0.03;
+        const pFunny = 0.06;
+
+        if ((drv?.reliability ?? 50) < 40) pAccident += 0.04;
+        if (get().bayramActive) pEds += 0.05;
 
         const r = Math.random();
         let ev: Omit<RoadEvent, "id"> | null = null;
 
+        const EDS = [
+          {
+            title: "EDS flaş — Bolu",
+            description: "Tabela 90. Kadran 118. Muavin: Flaş yedi kaptan!",
+            moneyChange: -1450,
+            reputationChange: -1,
+            emoji: "📸",
+          },
+          {
+            title: "EDS — Keşan çıkışı",
+            description: "Sabah sis, ayak gazda. Ceza kesin.",
+            moneyChange: -980,
+            reputationChange: 0,
+            emoji: "📸",
+          },
+          {
+            title: "EDS zinciri — TEM",
+            description: "Üç kamera art arda. Cüzdan ağlıyor.",
+            moneyChange: -2100,
+            reputationChange: -1,
+            emoji: "📸",
+          },
+        ];
+        const POLICE = [
+          {
+            title: "Çevirme — Belgeler",
+            description: "SRC, ruhsat, takograf. Beş dakika gerilim… geçti.",
+            moneyChange: 0,
+            reputationChange: 0,
+            emoji: "🚓",
+          },
+          {
+            title: "Çevirme — tartı",
+            description: "Bagaj fazla gibi. Uyarı ile bırakıldınız.",
+            moneyChange: -200,
+            reputationChange: 0,
+            emoji: "🚓",
+          },
+          {
+            title: "Çevirme — gece",
+            description: "Fener yüze. Kimlik kontrol, yol açık.",
+            moneyChange: 0,
+            reputationChange: 0,
+            emoji: "🚓",
+          },
+        ];
+        const ACC = [
+          {
+            title: "Virajda savrulma",
+            description: "Ayna kırıldı, sinirler gerildi.",
+            moneyChange: -6500,
+            reputationChange: -4,
+            emoji: "💥",
+          },
+          {
+            title: "Lastik patladı",
+            description: "Duble yolda 35 dk bekleyiş.",
+            moneyChange: -2400,
+            reputationChange: -1,
+            emoji: "🛞",
+          },
+        ];
+        const FUN = [
+          {
+            title: "Mikrofon açık",
+            description: "Şoför türkü sandı… bütün otobüs duydu.",
+            moneyChange: 0,
+            reputationChange: -1,
+            emoji: "🎙️",
+          },
+          {
+            title: "Pişmaniye kavgası",
+            description: "İki yolcu son pakete göz dikti.",
+            moneyChange: 0,
+            reputationChange: 0,
+            emoji: "🍬",
+          },
+        ];
+
         if (r < pJandarma && exp.smuggle) {
           ev = {
             type: "jandarma",
-            title: "Jandarma!",
-            description: "Kaçak yük. Araç bağlanabilir.",
+            title: "Jandarma — bagaj",
+            description: "Kara koli. Araç bağlanabilir.",
             moneyChange: -12000,
             reputationChange: -8,
             emoji: "🚨",
           };
-        } else if (r < pJandarma + pAccident) {
-          ev = {
-            type: "accident",
-            title: "Virajda savrulma",
-            description: "Muavin bağırıyor. Hasar ve panik.",
-            moneyChange: -7000,
-            reputationChange: -4,
-            emoji: "💥",
-          };
-        } else if (r < pJandarma + pAccident + pEds) {
-          ev = {
-            type: "eds",
-            title: "EDS — Bolu",
-            description: "Tabela 90, kadran 118.",
-            moneyChange: -1450,
-            reputationChange: -1,
-            emoji: "📸",
-          };
-        } else if (r < pJandarma + pAccident + pEds + pPolice) {
-          ev = {
-            type: "police",
-            title: "Çevirme",
-            description: "Rutin kontrol, sorun yok.",
-            moneyChange: 0,
-            reputationChange: 0,
-            emoji: "🚓",
-          };
+        } else if (r < pJandarma + pEds) {
+          const x = EDS[Math.floor(Math.random() * EDS.length)];
+          ev = { type: "eds", ...x };
+        } else if (r < pJandarma + pEds + pPolice) {
+          const x = POLICE[Math.floor(Math.random() * POLICE.length)];
+          ev = { type: "police", ...x };
+        } else if (r < pJandarma + pEds + pPolice + pAccident) {
+          const x = ACC[Math.floor(Math.random() * ACC.length)];
+          ev = { type: "accident", ...x };
+        } else if (r < pJandarma + pEds + pPolice + pAccident + pFunny) {
+          const x = FUN[Math.floor(Math.random() * FUN.length)];
+          ev = { type: "funny", ...x };
         }
 
         if (!ev) return null;
 
         const event: RoadEvent = { ...ev, id: `evt-${Date.now()}` };
         set((s) => ({
-          balance: s.balance + event.moneyChange,
+          balance: Math.max(0, s.balance + event.moneyChange),
           reputation: Math.max(
             0,
             Math.min(100, s.reputation + event.reputationChange)
           ),
           lastEvent: event,
+          ağaEnergy: Math.max(0, s.ağaEnergy - 3),
         }));
         if (event.moneyChange) get().addLedger(event.title, event.moneyChange);
 
@@ -1299,9 +1336,13 @@ export const useGameStore = create<GameState>()(
                 : b
             ),
           }));
+          get().pushPhone("Hakiki Peron", "MANŞET: Bagajda yakalandı!");
         }
         if (event.type === "accident") {
           get().openMeeting("Kaza — bir daha olmasın");
+        }
+        if (event.type === "eds") {
+          get().pushPhone("Trafik", `${event.title}: ceza yazıldı.`);
         }
         return event;
       },
@@ -1310,7 +1351,35 @@ export const useGameStore = create<GameState>()(
 
       priceCapMultiplier: () =>
         get().bayramActive ? 2.2 : get().rivalWeak ? 1.15 : 1,
+
+      canUseBus: (busId) => {
+        const b = get().buses.find((x) => x.id === busId);
+        if (!b) return false;
+        const now = Date.now();
+        if (b.repairingUntil && b.repairingUntil > now) return false;
+        if (b.impoundedUntil && b.impoundedUntil > now) return false;
+        return true;
+      },
+
+      startBusRepair: (busId) => {
+        const b = get().buses.find((x) => x.id === busId);
+        if (!b || get().balance < 8000) return false;
+        set((s) => ({
+          balance: s.balance - 8000,
+          buses: s.buses.map((x) =>
+            x.id === busId
+              ? {
+                  ...x,
+                  repairingUntil: Date.now() + 2 * REAL_MS_PER_GAME_DAY,
+                  engineHealth: Math.min(100, x.engineHealth + 40),
+                }
+              : x
+          ),
+        }));
+        get().addLedger(`Tamir: ${b.name}`, -8000);
+        return true;
+      },
     }),
-    { name: "otogar-tycoon-save-v6" }
+    { name: "otogar-tycoon-save-v7" }
   )
 );
