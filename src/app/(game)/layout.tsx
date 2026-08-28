@@ -25,6 +25,8 @@ import TicketReceipt from "@/components/TicketReceipt";
 import NewspaperModal from "@/components/NewspaperModal";
 import InspectorModal from "@/components/InspectorModal";
 import MeetingModal from "@/components/MeetingModal";
+import ForceRegisterModal from "@/components/ForceRegisterModal";
+import PaperToast from "@/components/PaperToast";
 
 const menuItems = [
   { href: "/dashboard", label: "Panel", icon: LayoutDashboard },
@@ -54,6 +56,8 @@ export default function GameLayout({
     gameHour,
     gameYear,
     tickGameTime,
+    openPaperEdition,
+    newspaperSeenDay,
     drinkTea,
     teaStock,
     ağaEnergy,
@@ -61,7 +65,8 @@ export default function GameLayout({
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    const t = setInterval(() => tickGameTime(), 2000);
+    tickGameTime();
+    const t = setInterval(() => tickGameTime(), 5000);
     return () => clearInterval(t);
   }, [tickGameTime]);
 
@@ -82,7 +87,9 @@ export default function GameLayout({
                 : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100"
             }`}
           >
-            <Icon className={`w-4 h-4 shrink-0 ${active ? "text-cyan-400" : ""}`} />
+            <Icon
+              className={`w-4 h-4 shrink-0 ${active ? "text-cyan-400" : ""}`}
+            />
             {item.label}
           </Link>
         );
@@ -96,33 +103,49 @@ export default function GameLayout({
         <div className="flex items-center gap-2 min-w-0">
           <div
             className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-            style={{ background: "linear-gradient(135deg,#7B2CFF,#00F0FF)" }}
+            style={{
+              background: "linear-gradient(135deg,#7B2CFF,#00F0FF)",
+            }}
           >
             <Bus className="w-4 h-4 text-[#0D0D1A]" />
           </div>
           <div className="min-w-0">
             <div className="font-bold text-sm truncate">{companyName}</div>
-            <div className="text-[10px] text-cyan-400">{formatMoney(balance)}</div>
+            <div className="text-[10px] text-cyan-400">
+              {formatMoney(balance)}
+            </div>
           </div>
         </div>
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
           className="p-2 rounded-lg border border-zinc-700"
+          aria-label="Menü"
         >
           {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
       </header>
 
       {open && (
-        <div className="md:hidden fixed inset-0 z-40 bg-black/60" onClick={() => setOpen(false)}>
+        <div
+          className="md:hidden fixed inset-0 z-40 bg-black/60"
+          onClick={() => setOpen(false)}
+        >
           <aside
-            className="absolute left-0 top-0 bottom-0 w-64 bg-[#0D0D1A] border-r border-zinc-800 p-3"
+            className="absolute left-0 top-0 bottom-0 w-64 bg-[#0D0D1A] border-r border-zinc-800 p-3 flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <nav className="space-y-0.5 pt-2">
+            <nav className="flex-1 space-y-0.5 pt-2 overflow-y-auto">
               <NavLinks onNavigate={() => setOpen(false)} />
             </nav>
+            <div className="border-t border-zinc-800 pt-3 text-xs text-zinc-500">
+              <div>
+                Gün {gameDay} · {String(gameHour ?? 0).padStart(2, "0")}:00
+              </div>
+              <Link href="/" className="flex items-center gap-2 pt-2">
+                <LogOut className="w-3.5 h-3.5" /> Çıkış
+              </Link>
+            </div>
           </aside>
         </div>
       )}
@@ -131,31 +154,56 @@ export default function GameLayout({
         <div className="p-4 border-b border-zinc-800 flex items-center gap-3">
           <div
             className="w-9 h-9 rounded-lg flex items-center justify-center"
-            style={{ background: "linear-gradient(135deg,#7B2CFF,#00F0FF)" }}
+            style={{
+              background: "linear-gradient(135deg,#7B2CFF,#00F0FF)",
+            }}
           >
             <Bus className="w-5 h-5 text-[#0D0D1A]" />
           </div>
           <div>
             <div className="font-bold text-sm">Otogar Tycoon</div>
-            <div className="text-[10px] text-zinc-500 uppercase tracking-wider">
+            <div className="text-[10px] text-zinc-500 tracking-wider uppercase">
               Peron Savaşları
             </div>
           </div>
         </div>
+
         <div className="p-4 border-b border-zinc-800">
           <div className="text-[10px] text-zinc-500">Şirket</div>
           <div className="font-medium text-sm truncate">{companyName}</div>
-          {isGuest && <div className="text-[10px] text-cyan-500/90">Misafir</div>}
+          {isGuest && (
+            <div className="mt-1 text-[10px] text-cyan-500/90">Misafir</div>
+          )}
         </div>
+
         <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
           <NavLinks />
         </nav>
+
         <div className="p-4 border-t border-zinc-800 space-y-2 text-xs">
-          <div className="text-lg font-bold text-cyan-400">{formatMoney(balance)}</div>
+          <div className="text-lg font-bold text-cyan-400">
+            {formatMoney(balance)}
+          </div>
           <div>İtibar {reputation}/100</div>
           <div className="text-zinc-500">
-            Gün {gameDay} · {String(gameHour ?? 0).padStart(2, "0")}:00 · {gameYear}
+            Gün {gameDay} · {String(gameHour ?? 0).padStart(2, "0")}:00 ·{" "}
+            {gameYear}
           </div>
+          <button
+            type="button"
+            onClick={() => openPaperEdition("morning")}
+            className="block text-left text-amber-500/90"
+          >
+            📰 Sabah
+            {newspaperSeenDay < gameDay ? " · YENİ" : ""}
+          </button>
+          <button
+            type="button"
+            onClick={() => openPaperEdition("evening")}
+            className="block text-left text-amber-600/80"
+          >
+            📰 Akşam
+          </button>
           <button
             type="button"
             onClick={drinkTea}
@@ -169,23 +217,29 @@ export default function GameLayout({
           {taxDue > 0 && (
             <div className="text-amber-600">Vergi {formatMoney(taxDue)}</div>
           )}
-          <Link href="/" className="flex items-center gap-2 text-zinc-500 pt-2">
+          <Link
+            href="/"
+            className="flex items-center gap-2 text-zinc-500 hover:text-red-400 pt-2"
+          >
             <LogOut className="w-3.5 h-3.5" /> Çıkış
           </Link>
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto min-w-0 pb-20 md:pb-0">{children}</main>
+      <main className="flex-1 overflow-auto min-w-0 pb-20 md:pb-0">
+        {children}
+      </main>
 
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-zinc-800 bg-[#0D0D1A]/95 flex justify-around py-2">
         {menuItems.slice(0, 5).map((item) => {
-          const active = pathname === item.href;
+          const active =
+            pathname === item.href || pathname.startsWith(item.href + "/");
           const Icon = item.icon;
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center gap-0.5 ${
+              className={`flex flex-col items-center gap-0.5 px-1 ${
                 active ? "text-cyan-400" : "text-zinc-500"
               }`}
             >
@@ -202,6 +256,8 @@ export default function GameLayout({
       <NewspaperModal />
       <InspectorModal />
       <MeetingModal />
+      <ForceRegisterModal />
+      <PaperToast />
     </div>
   );
 }
