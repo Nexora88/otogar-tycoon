@@ -54,8 +54,6 @@ export default function GameLayout({
     gameHour,
     gameYear,
     tickGameTime,
-    openPaperEdition,
-    newspaperSeenDay,
     drinkTea,
     teaStock,
     ağaEnergy,
@@ -158,21 +156,6 @@ export default function GameLayout({
           <div className="text-zinc-500">
             Gün {gameDay} · {String(gameHour ?? 0).padStart(2, "0")}:00 · {gameYear}
           </div>
-          <button
-            type="button"
-            onClick={() => openPaperEdition("morning")}
-            className="block text-left text-amber-500/90"
-          >
-            📰 Sabah baskısı
-            {newspaperSeenDay < gameDay ? " · YENİ" : ""}
-          </button>
-          <button
-            type="button"
-            onClick={() => openPaperEdition("evening")}
-            className="block text-left text-amber-600/80"
-          >
-            📰 Akşam baskısı
-          </button>
           <button
             type="button"
             onClick={drinkTea}
