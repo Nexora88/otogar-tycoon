@@ -1,4 +1,3 @@
-/** İl plaka kodları */
 export const CITY_PLATE: Record<string, string> = {
   edirne: "22",
   istanbul: "34",
