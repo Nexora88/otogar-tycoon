@@ -938,6 +938,7 @@ export const useGameStore = create<GameState>()(
 
         return event;
       },
+      
       paintBus: (id: string, c: BusColor) =>
         set((s) => ({
           buses: s.buses.map((b) => (b.id === id ? { ...b, color: c } : b)),
