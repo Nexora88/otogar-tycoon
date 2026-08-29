@@ -937,7 +937,8 @@ export const useGameStore = create<GameState>()(
         }
 
         return event;
-              paintBus: (id: string, c: BusColor) =>
+      },
+      paintBus: (id: string, c: BusColor) =>
         set((s) => ({
           buses: s.buses.map((b) => (b.id === id ? { ...b, color: c } : b)),
         })),
@@ -1593,9 +1594,8 @@ export const useGameStore = create<GameState>()(
         const code = get().roomCode || "????";
         return `Otogar Tycoon'da yazıhanemi kurdum, peron savaşlarında arkadaşlarıma meydan okuyorum! Oda Kodum: ${code}, gel esnaf gör!`;
       },
-      },
+      
     }),
     { name: "otogar-tycoon-save-v8" }
   )
 );
-
