@@ -785,16 +785,17 @@ export const useGameStore = create<GameState>()(
         take(FUNNY_POOL, pFunny);
         take(WEATHER_POOL, pWeather);
 
-        if (!pick) return null;
+                if (!pick) return null;
 
+        const selected: Omit<RoadEvent, "id"> = pick;
         const event: RoadEvent = {
           id: `evt-${Date.now()}`,
-          type: pick.type,
-          title: pick.title,
-          description: pick.description,
-          moneyChange: pick.moneyChange,
-          reputationChange: pick.reputationChange,
-          emoji: pick.emoji,
+          type: selected.type,
+          title: selected.title,
+          description: selected.description,
+          moneyChange: selected.moneyChange,
+          reputationChange: selected.reputationChange,
+          emoji: selected.emoji,
         };
 
         set((s) => ({
