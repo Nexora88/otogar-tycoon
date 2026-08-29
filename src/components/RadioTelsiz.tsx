@@ -1,20 +1,38 @@
 "use client";
 
-import { useEffect } from "react";
-import { useGameStore } from "@/store/gameStore";
+import { useEffect, useState } from "react";
+
+const LINES = [
+  "Czzzt… Keşan–Ankara 3 nolu perondan kalkacaktır, kaptan yerini alsın!",
+  "Czzzt… Bolu Dağı’nda sis var, sürati düşün kaptanlar!",
+  "Czzzt… 1 nolu peronda çığırtkan atışması, itibara bak!",
+  "Czzzt… Mazot konuşuluyor… yazıhaneler hesap yapıyor!",
+  "Czzzt… Rakip fiyat kırdı söylentisi… borsayı izleyin!",
+  "Czzzt… Akşam baskısı yaklaşıyor, manşet sıcak olacak!",
+  "Czzzt… Muavin mikrofonu açık unutmuş, yolcular gülüyor!",
+  "Czzzt… EDS flaş yağmuru Bolu çıkışı!",
+  "Czzzt… Pişmaniye stoku azaldı, ikramı kontrol edin!",
+  "Czzzt… Jandarma bagaj kontrolü artabilir!",
+  "Czzzt… Peron hoparlörü cızırdıyor, anons gecikti!",
+  "Czzzt… Gece seferi için kaptan hazır mı?",
+  "Czzzt… Çay ocakçısı maaşını sordu, not edin!",
+  "Czzzt… Yazıhane kapısı çalındı… kim geldi?",
+  "Czzzt… Lobi kodu paylaşan var, peron savaşı kızışıyor!",
+];
 
 export default function RadioTelsiz() {
-  const line = useGameStore((s) => s.radioLine);
-  const tickRadio = useGameStore((s) => s.tickRadio);
-  const setRadioLine = useGameStore((s) => s.setRadioLine);
+  const [line, setLine] = useState<string | null>(null);
+  const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
-    tickRadio();
-    const t = setInterval(() => tickRadio(), 28000);
+    const pick = () =>
+      setLine(LINES[Math.floor(Math.random() * LINES.length)]);
+    pick();
+    const t = setInterval(pick, 28000);
     return () => clearInterval(t);
-  }, [tickRadio]);
+  }, []);
 
-  if (!line) return null;
+  if (hidden || !line) return null;
 
   return (
     <div className="fixed bottom-20 md:bottom-4 left-3 right-3 md:left-auto md:right-4 md:max-w-sm z-40">
@@ -25,15 +43,13 @@ export default function RadioTelsiz() {
           </span>
           <button
             type="button"
-            onClick={() => setRadioLine(null)}
+            onClick={() => setHidden(true)}
             className="text-[10px] text-zinc-500"
           >
             kapat
           </button>
         </div>
-        <p className="text-xs text-zinc-300 leading-relaxed font-mono">
-          {line}
-        </p>
+        <p className="text-xs text-zinc-300 leading-relaxed font-mono">{line}</p>
       </div>
     </div>
   );
