@@ -1,169 +1,136 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useGameStore, type TerminalSlot, SLOT_INFO } from "@/store/gameStore";
+import { useGameStore, SLOT_INFO, type TerminalSlot } from "@/store/gameStore";
 import { formatMoney } from "@/lib/utils";
-import { Building2, Hammer } from "lucide-react";
 
-const BUILD_LIST = (
-  Object.entries(SLOT_INFO) as [
-    Exclude<TerminalSlot, "empty">,
-    (typeof SLOT_INFO)[Exclude<TerminalSlot, "empty">]
-  ][]
-).map(([type, info]) => ({ type, ...info }));
+const BUILDABLES = Object.keys(SLOT_INFO) as Exclude<TerminalSlot, "empty">[];
 
 export default function TerminalPage() {
   const {
-    terminalName,
     terminalBuilt,
+    terminalName,
     terminalSlots,
     balance,
-    securityRisk,
-    setTerminalName,
     startTerminalConstruction,
     buildSlot,
+    setTerminalName,
     collectPassiveIncome,
+    crierLevel,
+    upgradeCrier,
     triggerSecurityRaid,
   } = useGameStore();
 
-  const [nameInput, setNameInput] = useState(terminalName || "");
-  const [selected, setSelected] = useState<number | null>(null);
-
-  useEffect(() => {
-    collectPassiveIncome();
-    const t = setInterval(() => {
-      collectPassiveIncome();
-      if (Math.random() > 0.9) triggerSecurityRaid();
-    }, 2500);
-    return () => clearInterval(t);
-  }, [collectPassiveIncome, triggerSecurityRaid]);
-
-  const cps = terminalSlots.reduce(
-    (a, s) => a + (s === "empty" ? 0 : SLOT_INFO[s].cps),
-    0
-  );
+  const crierCost = 3000 + crierLevel * 4000;
 
   return (
-    <div className="p-6 md:p-8 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold flex items-center gap-2">
-        <Building2 className="w-6 h-6 text-amber-400" />
-        Terminalim
-      </h1>
-      <p className="text-zinc-400 text-sm mt-1 mb-6">
-        Arsaya yerleştir · pasif gelir · 80&apos;ler otogar ruhu
+    <div className="p-4 sm:p-8 max-w-4xl mx-auto">
+      <h1 className="text-2xl font-bold mb-1">Terminalim</h1>
+      <p className="text-zinc-500 text-sm mb-6">
+        Arsa üzerine 2.5D peron · Kasa {formatMoney(balance)}
       </p>
 
       {!terminalBuilt ? (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 max-w-md">
-          <div className="flex items-center gap-2 text-amber-400 mb-3">
-            <Hammer className="w-5 h-5" />
-            <span className="font-semibold">İnşaat ruhsatı</span>
-          </div>
-          <p className="text-sm text-zinc-400 mb-4">
-            Temel atmak <span className="text-zinc-200 font-medium">{formatMoney(100000)}</span>
-          </p>
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
           <input
-            value={nameInput}
-            onChange={(e) => setNameInput(e.target.value)}
-            placeholder="örn. Bakraç Otogarı"
-            className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-700 rounded-lg mb-4"
+            className="w-full mb-4 px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-lg text-sm"
+            placeholder="Terminal adı"
+            defaultValue={terminalName}
+            onBlur={(e) => setTerminalName(e.target.value)}
           />
           <button
+            type="button"
             onClick={() => {
-              setTerminalName(nameInput.trim() || "Yeni Terminal");
-              if (!startTerminalConstruction()) alert("100.000 ₺ gerekli");
+              if (!startTerminalConstruction())
+                alert("₺100.000 ve inşaat şart");
             }}
-            className="w-full py-3 bg-amber-500 text-black font-semibold rounded-xl"
+            className="px-5 py-2.5 bg-cyan-500 text-black font-semibold rounded-xl text-sm"
           >
-            İnşaata başla
+            İnşaata başla — ₺100.000
           </button>
         </div>
       ) : (
         <>
-          <div className="flex flex-wrap gap-4 justify-between mb-6">
-            <div>
-              <div className="text-xl font-bold text-amber-400">{terminalName}</div>
-              <div className="text-xs text-zinc-500">
-                Pasif: ~{cps.toFixed(1)} ₺/sn · Risk: %{securityRisk}
-              </div>
-            </div>
-            <div className="text-sm text-zinc-400">Kasa {formatMoney(balance)}</div>
-          </div>
-
-          {/* İzometrik grid */}
-          <div
-            className="relative mx-auto mb-8"
-            style={{
-              width: "min(100%, 420px)",
-              height: 280,
-              perspective: "600px",
-            }}
-          >
-            <div
-              className="absolute inset-0 grid grid-cols-3 gap-3 p-4"
-              style={{
-                transform: "rotateX(48deg) rotateZ(-12deg)",
-                transformStyle: "preserve-3d",
-              }}
+          <div className="mb-4 flex flex-wrap gap-2 items-center">
+            <span className="font-semibold text-amber-200">{terminalName}</span>
+            <button
+              type="button"
+              onClick={() => collectPassiveIncome()}
+              className="text-xs px-3 py-1 border border-zinc-700 rounded-lg"
             >
-              {terminalSlots.map((slot, i) => (
-                <button
-                  key={i}
-                  onClick={() => setSelected(i)}
-                  className={`relative rounded-lg border-2 text-left p-3 transition shadow-xl ${
-                    selected === i
-                      ? "border-amber-400 bg-amber-500/20"
-                      : slot === "empty"
-                      ? "border-dashed border-zinc-600 bg-zinc-800/80"
-                      : "border-zinc-600 bg-zinc-700"
-                  }`}
-                  style={{
-                    transform: "translateZ(8px)",
-                    minHeight: 72,
-                  }}
-                >
-                  <div className="text-[9px] text-zinc-500">Arsa {i + 1}</div>
-                  <div className="text-xs font-semibold text-zinc-100 leading-tight mt-1">
-                    {slot === "empty" ? "Boş" : SLOT_INFO[slot].label}
-                  </div>
-                  {slot === "toilet" && (
-                    <div className="text-[9px] text-zinc-400 mt-1">0.50–1₺ turnike</div>
-                  )}
-                </button>
-              ))}
-            </div>
+              Gelir topla
+            </button>
+            <button
+              type="button"
+              onClick={() => triggerSecurityRaid()}
+              className="text-xs px-3 py-1 border border-zinc-800 text-zinc-600 rounded-lg"
+            >
+              (Test) zabıta
+            </button>
           </div>
 
-          {selected !== null && terminalSlots[selected] === "empty" && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-              <div className="text-sm font-medium mb-3">Arsa {selected + 1} — inşa et</div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {BUILD_LIST.map((o) => (
-                  <button
-                    key={o.type}
-                    onClick={() => {
-                      if (!buildSlot(selected, o.type)) alert("Yetersiz bakiye");
-                      else setSelected(null);
-                    }}
-                    className="text-left p-3 rounded-lg border border-zinc-700 hover:border-amber-500/50"
-                  >
-                    <div className="font-medium text-sm">{o.label}</div>
-                    <div className="text-[11px] text-zinc-500 mt-0.5">{o.desc}</div>
-                    <div className="text-xs text-amber-400 mt-1">
-                      {formatMoney(o.cost)} · +{o.cps}₺/sn
-                      {o.risk > 0 && ` · risk ${o.risk}`}
+          {/* 2.5D grid */}
+          <div
+            className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8"
+            style={{ perspective: "600px" }}
+          >
+            {terminalSlots.map((slot, i) => (
+              <div
+                key={i}
+                className="relative rounded-xl border border-zinc-700 bg-gradient-to-br from-zinc-800 to-zinc-950 p-4 min-h-[120px]"
+                style={{
+                  transform: "rotateX(8deg)",
+                  boxShadow: "0 12px 24px rgba(0,0,0,0.45)",
+                }}
+              >
+                <div className="text-[10px] text-zinc-500">Parsel {i + 1}</div>
+                {slot === "empty" ? (
+                  <div className="mt-2 space-y-1">
+                    {BUILDABLES.map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => {
+                          if (!buildSlot(i, t)) alert("Kasa / dolu");
+                        }}
+                        className="block w-full text-left text-[10px] px-2 py-1 rounded bg-zinc-900 border border-zinc-800 hover:border-cyan-800"
+                      >
+                        {SLOT_INFO[t].label} · {formatMoney(SLOT_INFO[t].cost)}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-3">
+                    <div className="text-sm font-semibold text-cyan-200">
+                      {SLOT_INFO[slot].label}
                     </div>
-                  </button>
-                ))}
+                    <div className="text-[10px] text-zinc-500 mt-1">
+                      +{SLOT_INFO[slot].cps}/sn · {SLOT_INFO[slot].desc}
+                    </div>
+                    <div className="mt-3 h-16 rounded bg-zinc-900/80 border border-zinc-800 flex items-end justify-center pb-2">
+                      <div className="w-3/4 h-10 bg-gradient-to-t from-zinc-700 to-zinc-500 rounded-t shadow-lg" />
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            ))}
+          </div>
 
-          {selected !== null && terminalSlots[selected] !== "empty" && (
-            <div className="text-sm text-zinc-400 bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-              {SLOT_INFO[terminalSlots[selected] as Exclude<TerminalSlot, "empty">].desc}
-            </div>
-          )}
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+            <div className="font-semibold text-sm">Çığırtkan · Sv. {crierLevel}/5</div>
+            <p className="text-xs text-zinc-500 mt-1">
+              “Ankara kalkıyor!” — dolum hızı +%{crierLevel * 8}
+            </p>
+            <button
+              type="button"
+              disabled={crierLevel >= 5}
+              onClick={() => {
+                if (!upgradeCrier()) alert("Kasa / max");
+              }}
+              className="mt-3 px-4 py-2 text-sm rounded-lg border border-amber-700 text-amber-200 disabled:opacity-40"
+            >
+              {crierLevel >= 5 ? "Max" : `Yükselt ${formatMoney(crierCost)}`}
+            </button>
+          </div>
         </>
       )}
     </div>
