@@ -15,12 +15,48 @@ export type PricePulse = {
   at: number;
 };
 
+export type AuctionBid = {
+  peron: string;
+  bidder: string;
+  amount: number;
+  at: number;
+};
+
+export type SabotagePing = {
+  from: string;
+  target: string;
+  kind: "ariza" | "yakit" | "crier";
+  at: number;
+};
+
+export type LeaderPing = {
+  name: string;
+  company: string;
+  score: number;
+  rep: number;
+  title: string;
+  at: number;
+};
+
+export type PeronLot = {
+  id: string;
+  from: string;
+  to: string;
+  capacity: number;
+  minBid: number;
+  highBid: number;
+  highBidder: string | null;
+  endsAt: number;
+};
+
 export type RoomHandlers = {
   onChat?: (m: ChatMsg) => void;
   onPrice?: (p: PricePulse) => void;
   onPresence?: (count: number) => void;
   onAuction?: (a: AuctionBid) => void;
   onSabotage?: (s: SabotagePing) => void;
+  onLeader?: (l: LeaderPing) => void;
+  onLot?: (lot: PeronLot) => void;
 };
 
 let channel: RealtimeChannel | null = null;
@@ -31,6 +67,10 @@ export function leaveRoomChannel() {
     sb?.removeChannel(channel);
     channel = null;
   }
+}
+
+export function getActiveRoomChannel() {
+  return channel;
 }
 
 export async function joinRoomChannel(
@@ -45,7 +85,8 @@ export async function joinRoomChannel(
   }
 
   const sb = getSupabase()!;
-  const code = roomCode.toUpperCase();
+  const code = roomCode.trim().toUpperCase();
+  if (code.length < 4) return { ok: false, reason: "bad_code" };
 
   channel = sb.channel(`otogar-room:${code}`, {
     config: { presence: { key: playerName || "esnaf" } },
@@ -64,22 +105,36 @@ export async function joinRoomChannel(
     .on("broadcast", { event: "sabotage" }, ({ payload }) => {
       handlers.onSabotage?.(payload as SabotagePing);
     })
+    .on("broadcast", { event: "leader" }, ({ payload }) => {
+      handlers.onLeader?.(payload as LeaderPing);
+    })
+    .on("broadcast", { event: "lot" }, ({ payload }) => {
+      handlers.onLot?.(payload as PeronLot);
+    })
     .on("presence", { event: "sync" }, () => {
       const state = channel?.presenceState() || {};
-      const n = Object.keys(state).length;
-      handlers.onPresence?.(n);
+      handlers.onPresence?.(Object.keys(state).length);
     });
 
   const status = await new Promise<string>((resolve) => {
+    const t = setTimeout(() => resolve("TIMED_OUT"), 12000);
     channel!.subscribe(async (s) => {
       if (s === "SUBSCRIBED") {
-        await channel!.track({
-          name: playerName,
-          at: Date.now(),
-        });
+        clearTimeout(t);
+        try {
+          await channel!.track({
+            name: playerName,
+            at: Date.now(),
+          });
+        } catch {
+          /* */
+        }
         resolve("SUBSCRIBED");
       }
-      if (s === "CHANNEL_ERROR" || s === "TIMED_OUT") resolve(s);
+      if (s === "CHANNEL_ERROR" || s === "TIMED_OUT") {
+        clearTimeout(t);
+        resolve(s);
+      }
     });
   });
 
@@ -99,11 +154,7 @@ export async function sendChat(from: string, text: string) {
     text: text.slice(0, 200),
     at: Date.now(),
   };
-  await channel.send({
-    type: "broadcast",
-    event: "chat",
-    payload: msg,
-  });
+  await channel.send({ type: "broadcast", event: "chat", payload: msg });
   return true;
 }
 
@@ -119,26 +170,9 @@ export async function sendPrice(
     price,
     at: Date.now(),
   };
-  await channel.send({
-    type: "broadcast",
-    event: "price",
-    payload: p,
-  });
+  await channel.send({ type: "broadcast", event: "price", payload: p });
   return true;
 }
-export type AuctionBid = {
-  peron: string;
-  bidder: string;
-  amount: number;
-  at: number;
-};
-
-export type SabotagePing = {
-  from: string;
-  target: string;
-  kind: "ariza" | "yakit";
-  at: number;
-};
 
 export async function sendAuctionBid(
   peron: string,
@@ -146,24 +180,40 @@ export async function sendAuctionBid(
   amount: number
 ) {
   if (!channel) return false;
-  await channel.send({
-    type: "broadcast",
-    event: "auction",
-    payload: { peron, bidder, amount, at: Date.now() } satisfies AuctionBid,
-  });
+  const payload: AuctionBid = {
+    peron,
+    bidder,
+    amount,
+    at: Date.now(),
+  };
+  await channel.send({ type: "broadcast", event: "auction", payload });
   return true;
 }
 
 export async function sendSabotage(
   from: string,
   target: string,
-  kind: "ariza" | "yakit"
+  kind: "ariza" | "yakit" | "crier"
 ) {
   if (!channel) return false;
-  await channel.send({
-    type: "broadcast",
-    event: "sabotage",
-    payload: { from, target, kind, at: Date.now() } satisfies SabotagePing,
-  });
+  const payload: SabotagePing = {
+    from,
+    target,
+    kind,
+    at: Date.now(),
+  };
+  await channel.send({ type: "broadcast", event: "sabotage", payload });
   return true;
 }
+
+export async function sendLeader(payload: LeaderPing) {
+  if (!channel) return false;
+  await channel.send({ type: "broadcast", event: "leader", payload });
+  return true;
+}
+
+export async function sendLot(lot: PeronLot) {
+  if (!channel) return false;
+  await channel.send({ type: "broadcast", event: "lot", payload: lot });
+  return true;
+    }
