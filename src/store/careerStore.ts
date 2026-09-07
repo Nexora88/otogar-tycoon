@@ -21,8 +21,9 @@ import {
   MEMLEKET_HITAP,
 } from "@/data/apprenticeContent";
 import { getGlobalGameClock } from "@/lib/gameTime";
+import { rollDramaEvent, type DramaEvent } from "@/data/dramaEvents";
+import { useGameStore } from "@/store/gameStore";
 
-/** Terfi eşikleri — oynanabilir tempo */
 export function rankNeed(r: CareerRank): {
   trust: number;
   fame: number;
@@ -89,17 +90,18 @@ export interface CareerState {
   patronCalling: boolean;
   jobOffer: { company: string; body: string } | null;
   mafiaWhisper: string | null;
+  drama: DramaEvent | null;
   log: string[];
 
-  /** Terminal kurulabilir mi? */
   canFoundTerminal: () => boolean;
-
   startCareer: (name: string, memleket: string) => void;
   syncShiftFromClock: () => void;
   rollShiftTasks: () => void;
   openTask: (id: string) => void;
   resolveOption: (opt: DialogueOption) => void;
   rest: () => void;
+  maybeRollDrama: () => void;
+  resolveDrama: (choiceId: string) => void;
   triggerPatronCall: () => void;
   answerPatronCall: () => void;
   ignorePatronCall: () => void;
@@ -112,6 +114,8 @@ export interface CareerState {
   clearOutcome: () => void;
   pushLog: (line: string) => void;
 }
+
+export { RANK_LABEL, MEMLEKET_HITAP };
 
 export const useCareerStore = create<CareerState>()(
   persist(
@@ -142,6 +146,7 @@ export const useCareerStore = create<CareerState>()(
       patronCalling: false,
       jobOffer: null,
       mafiaWhisper: null,
+      drama: null,
       log: [],
 
       canFoundTerminal: () => {
@@ -205,10 +210,11 @@ export const useCareerStore = create<CareerState>()(
           patronCalling: false,
           jobOffer: null,
           mafiaWhisper: null,
+          drama: null,
           log: [
             `${workCity} · ${company}`,
             `Patron ${patron} · ${abi} / ${abi2}`,
-            `Hitap: ${hitap(mem, n)}. Perona yazıldın.`,
+            `Hitap: ${hitap(mem, n)}. Sefer yok — sadece yardım.`,
           ],
         });
         get().syncShiftFromClock();
@@ -231,7 +237,6 @@ export const useCareerStore = create<CareerState>()(
         get().syncShiftFromClock();
         const clock = getGlobalGameClock();
 
-        // Aynı oyun gününde tekrar basınca liste yenilenir ama yorgunluk artar
         if (s.lastTaskDay === clock.gameDay && s.tasks.length > 0) {
           set((st) => ({
             fatigue: clamp(st.fatigue + 4, 0, 100),
@@ -254,7 +259,7 @@ export const useCareerStore = create<CareerState>()(
           shiftsDone: s.shiftsDone + 1,
         });
         get().pushLog(
-          `${get().shiftLabelText}: ${tasks.length} iş · yorgunluk %${Math.round(get().fatigue)}`
+          `${get().shiftLabelText}: ${tasks.length} iş · yorgun %${Math.round(get().fatigue)}`
         );
 
         if (Math.random() > 0.65) get().triggerPatronCall();
@@ -266,6 +271,7 @@ export const useCareerStore = create<CareerState>()(
             ]!;
           set({ mafiaWhisper: h });
         }
+        if (Math.random() > 0.5) get().maybeRollDrama();
       },
 
       openTask: (id) => {
@@ -302,10 +308,7 @@ export const useCareerStore = create<CareerState>()(
           fameD = -3;
         } else {
           moneyD += baseWage;
-          if (opt.tone === "obedient") {
-            trustD += 0;
-            fameD += Math.random() > 0.75 ? 1 : 0;
-          }
+          if (opt.tone === "obedient" && Math.random() > 0.75) fameD += 1;
           if (opt.tone === "honest") fameD += 1;
           if (task.kind === "pis" && opt.tone === "obedient") trustD += 1;
         }
@@ -326,7 +329,9 @@ export const useCareerStore = create<CareerState>()(
           tasks: s.tasks.filter((t) => t.id !== task.id),
           activeTask: null,
           lastOutcome: `${speaker}: “${line}”${
-            !caught && baseWage > 0 ? ` · +${baseWage + Math.max(0, opt.moneyDelta)} ₺` : ""
+            !caught && baseWage > 0
+              ? ` · +${baseWage + Math.max(0, opt.moneyDelta)} ₺`
+              : ""
           }`,
           log: [
             `[${task.kind}] ${opt.label} → ${caught ? "YAKALANDI" : "ok"}`,
@@ -335,13 +340,62 @@ export const useCareerStore = create<CareerState>()(
         }));
 
         get().tryPromote();
+        if (Math.random() > 0.4) get().maybeRollDrama();
       },
 
       rest: () => {
         set((s) => ({
           fatigue: clamp(s.fatigue - 25, 0, 100),
-          lastOutcome: "Köşede 10 dk oturdun. Biraz toparlandın.",
+          lastOutcome: "Köşede 10 dk. Biraz toparlandın.",
         }));
+      },
+
+      maybeRollDrama: () => {
+        if (get().careerDone || get().drama || get().activeTask) return;
+        if (Math.random() > 0.55) return;
+        set({ drama: rollDramaEvent() });
+      },
+
+      resolveDrama: (choiceId) => {
+        const d = get().drama;
+        if (!d) return;
+        const ch = d.choices.find((c) => c.id === choiceId);
+        if (!ch) return;
+
+        set((s) => ({
+          drama: null,
+          trust: clamp(s.trust + ch.trustDelta, 0, 100),
+          fame: clamp(s.fame + ch.fameDelta, 0, 100),
+          savings: Math.max(0, s.savings + ch.moneyDelta),
+          fatigue: clamp(s.fatigue + ch.fatigueDelta, 0, 100),
+          lastOutcome: ch.result,
+          log: [`[Olay] ${d.title}: ${ch.label}`, ...s.log].slice(0, 50),
+        }));
+
+        if (d.kind === "fight" || d.kind === "mafia") {
+          try {
+            const day = useGameStore.getState().gameDay;
+            useGameStore.setState((s) => ({
+              eveningPaper: [
+                {
+                  id: `dr-news-${Date.now()}`,
+                  headline:
+                    d.kind === "mafia"
+                      ? "Peron fısıltısı: ağır ziyaret"
+                      : `Peronda arbede: ${d.title}`,
+                  body: d.body.slice(0, 160),
+                  kind: "rival" as const,
+                  aboutPlayer: true,
+                  day,
+                },
+                ...s.eveningPaper,
+              ].slice(0, 8),
+              paperNotify: "evening",
+            }));
+          } catch {
+            /* ignore */
+          }
+        }
       },
 
       triggerPatronCall: () => {
@@ -422,7 +476,7 @@ export const useCareerStore = create<CareerState>()(
 
         set({
           careerDone: true,
-          rank: s.rank === "bagimsiz" ? "bagimsiz" : s.rank,
+          drama: null,
           lastOutcome: `${s.patronName}: “Kapı orada. Peron unutmaz.”`,
           log: [
             "İstifa — terminal kurma hakkı açıldı.",
@@ -447,9 +501,7 @@ export const useCareerStore = create<CareerState>()(
             lastOutcome: `Terfi: ${RANK_LABEL[nxt]}`,
           });
           get().pushLog(`Terfi → ${RANK_LABEL[nxt]}`);
-          if (nxt === "bagimsiz") {
-            get().markIndependent();
-          }
+          if (nxt === "bagimsiz") get().markIndependent();
           return true;
         }
         return false;
@@ -459,14 +511,16 @@ export const useCareerStore = create<CareerState>()(
         set({
           careerDone: true,
           rank: "bagimsiz",
+          drama: null,
           lastOutcome:
-            "Bağımsız esnaf oldun. Belediyeden terminal ruhsatı alabilirsin.",
+            "Bağımsız esnaf. Belediyeden terminal ruhsatı alabilirsin.",
         });
         get().pushLog("Bağımsız — /setup açık");
       },
 
-      clearOutcome: () => set({ lastOutcome: null, mafiaWhisper: null }),
+      clearOutcome: () =>
+        set({ lastOutcome: null, mafiaWhisper: null }),
     }),
-    { name: "otogar-career-v2" }
+    { name: "otogar-career-v3" }
   )
 );
