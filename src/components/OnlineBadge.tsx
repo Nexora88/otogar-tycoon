@@ -1,14 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { subscribeGlobalPresence } from "@/lib/globalPresence";
 
 export default function OnlineBadge() {
   const [count, setCount] = useState<number | null>(null);
-  const [mode, setMode] = useState<"live" | "local">("local");
+  const [live, setLive] = useState(false);
 
   useEffect(() => {
-    setMode("local");
-    setCount(1);
+    let unsub = () => {};
+    void (async () => {
+      unsub = await subscribeGlobalPresence("ziyaretci", (p) => {
+        setCount(p.online);
+        setLive(p.live);
+      });
+    })();
+    return () => unsub();
   }, []);
 
   return (
@@ -22,7 +29,7 @@ export default function OnlineBadge() {
       ) : (
         <span>
           {count} çevrimiçi
-          {mode === "local" ? " (yerel)" : ""}
+          {!live ? " · yerel" : " · canlı"}
         </span>
       )}
     </div>
