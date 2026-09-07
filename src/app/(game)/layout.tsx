@@ -1,47 +1,45 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useGameStore } from "@/store/gameStore";
+import { useCareerStore, RANK_LABEL } from "@/store/careerStore";
+import { TelsizTicker } from "@/components/TelsizTicker";
+import NewspaperModal from "@/components/NewspaperModal";
+import PhoneUI from "@/components/PhoneUI";
+import { formatMoney } from "@/lib/utils";
 import {
   LayoutDashboard,
-  Warehouse,
-  Route,
-  ShoppingBag,
-  Building2,
-  Landmark,
-  LogOut,
   Bus,
-  Menu,
-  X,
-  MapPin,
+  Route,
+  Building2,
+  Map,
+  Store,
+  Warehouse,
+  Radio,
   Users,
-  Coffee,
-  Swords,
+  Briefcase,
+  Newspaper,
 } from "lucide-react";
-import { useGameStore } from "@/store/gameStore";
-import { useCareerStore } from "@/store/careerStore";
-import { formatMoney } from "@/lib/utils";
-import ComplaintModal from "@/components/ComplaintModal";
-import PhoneUI from "@/components/PhoneUI";
-import TicketReceipt from "@/components/TicketReceipt";
-import NewspaperModal from "@/components/NewspaperModal";
-import InspectorModal from "@/components/InspectorModal";
-import MeetingModal from "@/components/MeetingModal";
-import ForceRegisterModal from "@/components/ForceRegisterModal";
-import PaperToast from "@/components/PaperToast";
 
-const menuItems = [
-  { href: "/shift", label: "Vardiya", icon: Coffee },
+const NAV: {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+  /** true = sadece ağa (careerDone) */
+  tycoonOnly?: boolean;
+}[] = [
+  { href: "/shift", label: "Vardiya", icon: Briefcase },
   { href: "/dashboard", label: "Panel", icon: LayoutDashboard },
-  { href: "/map", label: "Harita", icon: MapPin },
-  { href: "/lobby", label: "Lobi", icon: Swords },
-  { href: "/garage", label: "Garaj", icon: Warehouse },
-  { href: "/expeditions", label: "Seferler", icon: Route },
-  { href: "/staff", label: "Kadro", icon: Users },
-  { href: "/office", label: "Ofis", icon: Landmark },
-  { href: "/terminal", label: "Terminal", icon: Building2 },
-  { href: "/market", label: "Pazar", icon: ShoppingBag },
+  { href: "/map", label: "Harita", icon: Map, tycoonOnly: true },
+  { href: "/expeditions", label: "Seferler", icon: Route, tycoonOnly: true },
+  { href: "/garage", label: "Garaj", icon: Bus, tycoonOnly: true },
+  { href: "/market", label: "Pazar", icon: Store, tycoonOnly: true },
+  { href: "/office", label: "Ofis", icon: Building2, tycoonOnly: true },
+  { href: "/terminal", label: "Terminal", icon: Warehouse, tycoonOnly: true },
+  { href: "/staff", label: "Kadro", icon: Users, tycoonOnly: true },
+  { href: "/lobby", label: "Lobi", icon: Radio },
 ];
 
 export default function GameLayout({
@@ -49,272 +47,188 @@ export default function GameLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
-  const companyName = useGameStore((s) => s.companyName);
+  const path = usePathname();
   const balance = useGameStore((s) => s.balance);
   const reputation = useGameStore((s) => s.reputation);
-  const isGuest = useGameStore((s) => s.isGuest);
-  const bankDebt = useGameStore((s) => s.bankDebt);
-  const taxDue = useGameStore((s) => s.taxDue);
+  const companyName = useGameStore((s) => s.companyName);
   const gameDay = useGameStore((s) => s.gameDay);
   const gameHour = useGameStore((s) => s.gameHour);
-  const gameYear = useGameStore((s) => s.gameYear);
-  const tickGameTime = useGameStore((s) => s.tickGameTime);
+  const paperNotify = useGameStore((s) => s.paperNotify);
+  const mafiaDebtDue = useGameStore((s) => s.mafiaDebtDue);
+  const activeBoss = useGameStore((s) => s.activeBoss);
+  const openNewspaper = useGameStore((s) => s.openNewspaper);
   const openPaperEdition = useGameStore((s) => s.openPaperEdition);
-  const newspaperSeenDay = useGameStore((s) => s.newspaperSeenDay);
-  const drinkTea = useGameStore((s) => s.drinkTea);
-  const teaStock = useGameStore((s) => s.teaStock);
-  const ağaEnergy = useGameStore((s) => s.ağaEnergy);
-  const fuelPrice = useGameStore((s) => s.fuelPrice);
+  const tickGameTime = useGameStore((s) => s.tickGameTime);
+  const setPhoneOpen = useGameStore((s) => s.setPhoneOpen);
 
-  const patronCalling = useCareerStore((s) => s.patronCalling);
   const careerStarted = useCareerStore((s) => s.careerStarted);
+  const careerDone = useCareerStore((s) => s.careerDone);
+  const rank = useCareerStore((s) => s.rank);
   const displayHitap = useCareerStore((s) => s.displayHitap);
-  const syncShift = useCareerStore((s) => s.syncShiftFromClock);
+  const savings = useCareerStore((s) => s.savings);
 
-  const [open, setOpen] = useState(false);
-
+  const [mounted, setMounted] = useState(false);
   useEffect(() => {
-    tickGameTime?.();
-    const t = setInterval(() => {
-      tickGameTime?.();
-      syncShift?.();
-    }, 5000);
-    return () => clearInterval(t);
-  }, [tickGameTime, syncShift]);
+    setMounted(true);
+    const id = setInterval(() => tickGameTime(), 4000);
+    return () => clearInterval(id);
+  }, [tickGameTime]);
 
-  const NavLinks = ({ onNavigate }: { onNavigate?: () => void }) => (
-    <>
-      {menuItems.map((item) => {
-        const active =
-          pathname === item.href || pathname.startsWith(item.href + "/");
-        const Icon = item.icon;
-        const badge = item.href === "/shift" && patronCalling;
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={onNavigate}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition relative ${
-              active
-                ? "bg-cyan-500/10 text-cyan-300"
-                : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100"
-            }`}
-          >
-            <Icon
-              className={`w-4 h-4 shrink-0 ${active ? "text-cyan-400" : ""}`}
-            />
-            {item.label}
-            {badge && (
-              <span className="ml-auto w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-            )}
-          </Link>
-        );
-      })}
-    </>
-  );
+  const isCirak = careerStarted && !careerDone;
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-[#0D0D1A] text-zinc-100">
-      <header className="md:hidden sticky top-0 z-30 flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-[#0D0D1A]/95">
-        <div className="flex items-center gap-2 min-w-0">
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-            style={{
-              background: "linear-gradient(135deg,#7B2CFF,#00F0FF)",
-            }}
-          >
-            <Bus className="w-4 h-4 text-[#0D0D1A]" />
-          </div>
-          <div className="min-w-0">
-            <div className="font-bold text-sm truncate">
-              {careerStarted && displayHitap ? displayHitap : companyName}
-            </div>
-            <div className="text-[10px] text-cyan-400">
-              {formatMoney(balance)}
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {patronCalling && (
-            <Link
-              href="/shift"
-              className="text-[10px] px-2 py-1 rounded bg-amber-600 text-black font-bold"
-            >
-              PATRON
-            </Link>
-          )}
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            className="p-2 rounded-lg border border-zinc-700"
-            aria-label="Menü"
-          >
-            {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
-        </div>
-      </header>
-
-      {open && (
-        <div
-          className="md:hidden fixed inset-0 z-40 bg-black/60"
-          onClick={() => setOpen(false)}
-        >
-          <aside
-            className="absolute left-0 top-0 bottom-0 w-64 bg-[#0D0D1A] border-r border-zinc-800 p-3 flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <nav className="flex-1 space-y-0.5 pt-2 overflow-y-auto">
-              <NavLinks onNavigate={() => setOpen(false)} />
-            </nav>
-            <div className="border-t border-zinc-800 pt-3 text-xs text-zinc-500">
-              <div>
-                Gün {gameDay} · {String(gameHour ?? 0).padStart(2, "0")}:00
-              </div>
-              <Link href="/" className="flex items-center gap-2 pt-2">
-                <LogOut className="w-3.5 h-3.5" /> Çıkış
-              </Link>
-            </div>
-          </aside>
-        </div>
-      )}
-
-      <aside className="hidden md:flex w-60 lg:w-64 border-r border-zinc-800 flex-col shrink-0">
-        <div className="p-4 border-b border-zinc-800 flex items-center gap-3">
-          <div
-            className="w-9 h-9 rounded-lg flex items-center justify-center"
-            style={{
-              background: "linear-gradient(135deg,#7B2CFF,#00F0FF)",
-            }}
-          >
-            <Bus className="w-5 h-5 text-[#0D0D1A]" />
-          </div>
-          <div>
-            <div className="font-bold text-sm">Otogar Tycoon</div>
-            <div className="text-[10px] text-zinc-500 tracking-wider uppercase">
-              Peron Savaşları · 1987
-            </div>
-          </div>
-        </div>
-
+    <div className="min-h-screen bg-[#0a0c10] text-zinc-100 flex flex-col md:flex-row">
+      {/* Sidebar desktop */}
+      <aside className="hidden md:flex w-56 flex-col border-r border-zinc-800/80 bg-zinc-950/90">
         <div className="p-4 border-b border-zinc-800">
-          <div className="text-[10px] text-zinc-500">
-            {careerStarted ? "Hitap / Şirket" : "Şirket"}
+          <div className="text-[10px] tracking-[0.2em] text-amber-600 font-bold">
+            OTOGAR TYCOON
           </div>
-          <div className="font-medium text-sm truncate">
-            {careerStarted && displayHitap ? displayHitap : companyName}
+          <div className="text-sm font-semibold mt-1 truncate">
+            {isCirak ? displayHitap || "Çırak" : companyName}
           </div>
-          {isGuest && (
-            <div className="mt-1 text-[10px] text-cyan-500/90">Misafir</div>
+          <div className="text-[11px] text-zinc-500 mt-0.5">
+            1987 · Gün {gameDay} · {String(gameHour).padStart(2, "0")}:00
+          </div>
+          {isCirak && (
+            <div className="mt-2 text-[10px] px-2 py-1 rounded bg-amber-950/50 text-amber-400 border border-amber-900/40">
+              {RANK_LABEL[rank]} · birikim {savings} ₺
+            </div>
           )}
         </div>
 
-        <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
-          <NavLinks />
+        <nav className="flex-1 p-2 space-y-0.5">
+          {NAV.map((item) => {
+            const locked = item.tycoonOnly && isCirak;
+            const active = path.startsWith(item.href);
+            const Icon = item.icon;
+            if (locked) {
+              return (
+                <div
+                  key={item.href}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-zinc-600 cursor-not-allowed"
+                  title="Bağımsız olunca açılır"
+                >
+                  <Icon className="w-4 h-4 opacity-40" />
+                  {item.label}
+                  <span className="ml-auto text-[9px] opacity-50">🔒</span>
+                </div>
+              );
+            }
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors ${
+                  active
+                    ? "bg-amber-500/15 text-amber-300 border border-amber-700/40"
+                    : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
 
-        <div className="p-4 border-t border-zinc-800 space-y-2 text-xs">
-          <div className="text-lg font-bold text-cyan-400">
-            {formatMoney(balance)}
+        <TelsizTicker />
+
+        <div className="p-3 border-t border-zinc-800 space-y-2">
+          <div className="flex justify-between text-xs">
+            <span className="text-zinc-500">Kasa</span>
+            <span className="font-mono text-emerald-400">
+              {mounted ? formatMoney(balance) : "—"}
+            </span>
           </div>
-          <div>İtibar {reputation}/100</div>
-          <div className="text-zinc-500">
-            Gün {gameDay} · {String(gameHour ?? 0).padStart(2, "0")}:00 ·{" "}
-            {gameYear ?? 1987}
+          <div className="flex justify-between text-xs">
+            <span className="text-zinc-500">İtibar</span>
+            <span className="text-cyan-400">{reputation}</span>
           </div>
-          {fuelPrice != null && (
-            <div className="text-amber-600/90">Mazot {fuelPrice} ₺</div>
-          )}
           <button
             type="button"
-            onClick={() => openPaperEdition?.("morning")}
-            className="block text-left text-amber-500/90"
+            onClick={() => openNewspaper()}
+            className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-zinc-700 text-xs hover:border-amber-600"
           >
-            📰 Sabah
-            {newspaperSeenDay != null && newspaperSeenDay < gameDay
-              ? " · YENİ"
-              : ""}
+            <Newspaper className="w-3.5 h-3.5" />
+            Gazete
+            {paperNotify && (
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            )}
           </button>
           <button
             type="button"
-            onClick={() => openPaperEdition?.("evening")}
-            className="block text-left text-amber-600/80"
+            onClick={() => setPhoneOpen(true)}
+            className="w-full py-2 rounded-lg bg-zinc-900 border border-zinc-700 text-xs"
           >
-            📰 Akşam
+            Telefon
           </button>
-          <button
-            type="button"
-            onClick={() => drinkTea?.()}
-            className="block text-left text-zinc-400"
-          >
-            ☕ Çay ({teaStock ?? 0}) · Enerji %
-            {Math.round(ağaEnergy ?? 0)}
-          </button>
-          {patronCalling && (
-            <Link
-              href="/shift"
-              className="block text-left text-amber-400 font-bold animate-pulse"
-            >
-              ⚠ Patron çağırdı
-            </Link>
-          )}
-          {bankDebt > 0 && (
-            <div className="text-red-400">Borç {formatMoney(bankDebt)}</div>
-          )}
-          {taxDue > 0 && (
-            <div className="text-amber-600">Vergi {formatMoney(taxDue)}</div>
-          )}
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-zinc-500 hover:text-red-400 pt-2"
-          >
-            <LogOut className="w-3.5 h-3.5" /> Çıkış
-          </Link>
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto min-w-0 pb-20 md:pb-0">
-        {children}
-      </main>
-
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-zinc-800 bg-[#0D0D1A]/95 flex justify-around py-2">
-        {[
-          menuItems[0],
-          menuItems[1],
-          menuItems[2],
-          menuItems[5],
-          menuItems[3],
-        ].map((item) => {
-          if (!item) return null;
-          const active =
-            pathname === item.href || pathname.startsWith(item.href + "/");
-          const Icon = item.icon;
-          return (
+      {/* Main */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Top bar mobile + desktop strip */}
+        <header className="sticky top-0 z-30 border-b border-zinc-800/80 bg-[#0a0c10]/95 backdrop-blur px-3 py-2 flex items-center gap-3">
+          <div className="md:hidden text-[10px] font-bold text-amber-600 tracking-widest">
+            OTOGAR
+          </div>
+          <div className="flex-1 text-xs text-zinc-500 truncate">
+            {mounted && (
+              <>
+                Gün {gameDay} · {String(gameHour).padStart(2, "0")}:00 ·{" "}
+                <span className="text-emerald-400/90">
+                  {formatMoney(balance)}
+                </span>
+              </>
+            )}
+          </div>
+          {mafiaDebtDue && (
             <Link
-              key={item.href}
-              href={item.href}
-              className={`flex flex-col items-center gap-0.5 px-1 relative ${
-                active ? "text-cyan-400" : "text-zinc-500"
-              }`}
+              href="/office"
+              className="text-[10px] px-2 py-1 rounded bg-red-950 border border-red-800 text-red-300 animate-pulse"
             >
-              <Icon className="w-5 h-5" />
-              <span className="text-[9px]">{item.label}</span>
-              {item.href === "/shift" && patronCalling && (
-                <span className="absolute top-0 right-1 w-1.5 h-1.5 bg-amber-500 rounded-full" />
-              )}
+              {activeBoss?.bossName || "Aidat"}!
             </Link>
-          );
-        })}
-      </nav>
+          )}
+          {paperNotify && (
+            <button
+              type="button"
+              onClick={() => openPaperEdition(paperNotify)}
+              className="text-[10px] px-2 py-1 rounded bg-amber-950 border border-amber-800 text-amber-300"
+            >
+              {paperNotify === "morning" ? "Sabah baskı" : "Akşam baskı"}
+            </button>
+          )}
+        </header>
 
-      <ComplaintModal />
-      <PhoneUI />
-      <TicketReceipt />
+        <main className="flex-1 overflow-auto pb-20 md:pb-6">{children}</main>
+
+        {/* Mobile nav */}
+        <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-zinc-800 bg-zinc-950/95 backdrop-blur flex overflow-x-auto">
+          {NAV.filter((n) => !n.tycoonOnly || !isCirak)
+            .slice(0, 6)
+            .map((item) => {
+              const Icon = item.icon;
+              const active = path.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex-1 min-w-[4.5rem] flex flex-col items-center py-2 text-[10px] ${
+                    active ? "text-amber-400" : "text-zinc-500"
+                  }`}
+                >
+                  <Icon className="w-4 h-4 mb-0.5" />
+                  {item.label}
+                </Link>
+              );
+            })}
+        </nav>
+      </div>
+
       <NewspaperModal />
-      <InspectorModal />
-      <MeetingModal />
-      <ForceRegisterModal />
-      <PaperToast />
+      <PhoneUI />
     </div>
   );
 }
