@@ -16,8 +16,11 @@ import {
   X,
   MapPin,
   Users,
+  Coffee,
+  Swords,
 } from "lucide-react";
 import { useGameStore } from "@/store/gameStore";
+import { useCareerStore } from "@/store/careerStore";
 import { formatMoney } from "@/lib/utils";
 import ComplaintModal from "@/components/ComplaintModal";
 import PhoneUI from "@/components/PhoneUI";
@@ -29,8 +32,10 @@ import ForceRegisterModal from "@/components/ForceRegisterModal";
 import PaperToast from "@/components/PaperToast";
 
 const menuItems = [
+  { href: "/shift", label: "Vardiya", icon: Coffee },
   { href: "/dashboard", label: "Panel", icon: LayoutDashboard },
   { href: "/map", label: "Harita", icon: MapPin },
+  { href: "/lobby", label: "Lobi", icon: Swords },
   { href: "/garage", label: "Garaj", icon: Warehouse },
   { href: "/expeditions", label: "Seferler", icon: Route },
   { href: "/staff", label: "Kadro", icon: Users },
@@ -45,30 +50,38 @@ export default function GameLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const {
-    companyName,
-    balance,
-    reputation,
-    isGuest,
-    bankDebt,
-    taxDue,
-    gameDay,
-    gameHour,
-    gameYear,
-    tickGameTime,
-    openPaperEdition,
-    newspaperSeenDay,
-    drinkTea,
-    teaStock,
-    ağaEnergy,
-  } = useGameStore();
+  const companyName = useGameStore((s) => s.companyName);
+  const balance = useGameStore((s) => s.balance);
+  const reputation = useGameStore((s) => s.reputation);
+  const isGuest = useGameStore((s) => s.isGuest);
+  const bankDebt = useGameStore((s) => s.bankDebt);
+  const taxDue = useGameStore((s) => s.taxDue);
+  const gameDay = useGameStore((s) => s.gameDay);
+  const gameHour = useGameStore((s) => s.gameHour);
+  const gameYear = useGameStore((s) => s.gameYear);
+  const tickGameTime = useGameStore((s) => s.tickGameTime);
+  const openPaperEdition = useGameStore((s) => s.openPaperEdition);
+  const newspaperSeenDay = useGameStore((s) => s.newspaperSeenDay);
+  const drinkTea = useGameStore((s) => s.drinkTea);
+  const teaStock = useGameStore((s) => s.teaStock);
+  const ağaEnergy = useGameStore((s) => s.ağaEnergy);
+  const fuelPrice = useGameStore((s) => s.fuelPrice);
+
+  const patronCalling = useCareerStore((s) => s.patronCalling);
+  const careerStarted = useCareerStore((s) => s.careerStarted);
+  const displayHitap = useCareerStore((s) => s.displayHitap);
+  const syncShift = useCareerStore((s) => s.syncShiftFromClock);
+
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    tickGameTime();
-    const t = setInterval(() => tickGameTime(), 5000);
+    tickGameTime?.();
+    const t = setInterval(() => {
+      tickGameTime?.();
+      syncShift?.();
+    }, 5000);
     return () => clearInterval(t);
-  }, [tickGameTime]);
+  }, [tickGameTime, syncShift]);
 
   const NavLinks = ({ onNavigate }: { onNavigate?: () => void }) => (
     <>
@@ -76,12 +89,13 @@ export default function GameLayout({
         const active =
           pathname === item.href || pathname.startsWith(item.href + "/");
         const Icon = item.icon;
+        const badge = item.href === "/shift" && patronCalling;
         return (
           <Link
             key={item.href}
             href={item.href}
             onClick={onNavigate}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition relative ${
               active
                 ? "bg-cyan-500/10 text-cyan-300"
                 : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100"
@@ -91,6 +105,9 @@ export default function GameLayout({
               className={`w-4 h-4 shrink-0 ${active ? "text-cyan-400" : ""}`}
             />
             {item.label}
+            {badge && (
+              <span className="ml-auto w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            )}
           </Link>
         );
       })}
@@ -110,20 +127,32 @@ export default function GameLayout({
             <Bus className="w-4 h-4 text-[#0D0D1A]" />
           </div>
           <div className="min-w-0">
-            <div className="font-bold text-sm truncate">{companyName}</div>
+            <div className="font-bold text-sm truncate">
+              {careerStarted && displayHitap ? displayHitap : companyName}
+            </div>
             <div className="text-[10px] text-cyan-400">
               {formatMoney(balance)}
             </div>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          className="p-2 rounded-lg border border-zinc-700"
-          aria-label="Menü"
-        >
-          {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
+        <div className="flex items-center gap-2">
+          {patronCalling && (
+            <Link
+              href="/shift"
+              className="text-[10px] px-2 py-1 rounded bg-amber-600 text-black font-bold"
+            >
+              PATRON
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="p-2 rounded-lg border border-zinc-700"
+            aria-label="Menü"
+          >
+            {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
       </header>
 
       {open && (
@@ -163,14 +192,18 @@ export default function GameLayout({
           <div>
             <div className="font-bold text-sm">Otogar Tycoon</div>
             <div className="text-[10px] text-zinc-500 tracking-wider uppercase">
-              Peron Savaşları
+              Peron Savaşları · 1987
             </div>
           </div>
         </div>
 
         <div className="p-4 border-b border-zinc-800">
-          <div className="text-[10px] text-zinc-500">Şirket</div>
-          <div className="font-medium text-sm truncate">{companyName}</div>
+          <div className="text-[10px] text-zinc-500">
+            {careerStarted ? "Hitap / Şirket" : "Şirket"}
+          </div>
+          <div className="font-medium text-sm truncate">
+            {careerStarted && displayHitap ? displayHitap : companyName}
+          </div>
           {isGuest && (
             <div className="mt-1 text-[10px] text-cyan-500/90">Misafir</div>
           )}
@@ -187,30 +220,44 @@ export default function GameLayout({
           <div>İtibar {reputation}/100</div>
           <div className="text-zinc-500">
             Gün {gameDay} · {String(gameHour ?? 0).padStart(2, "0")}:00 ·{" "}
-            {gameYear}
+            {gameYear ?? 1987}
           </div>
+          {fuelPrice != null && (
+            <div className="text-amber-600/90">Mazot {fuelPrice} ₺</div>
+          )}
           <button
             type="button"
-            onClick={() => openPaperEdition("morning")}
+            onClick={() => openPaperEdition?.("morning")}
             className="block text-left text-amber-500/90"
           >
             📰 Sabah
-            {newspaperSeenDay < gameDay ? " · YENİ" : ""}
+            {newspaperSeenDay != null && newspaperSeenDay < gameDay
+              ? " · YENİ"
+              : ""}
           </button>
           <button
             type="button"
-            onClick={() => openPaperEdition("evening")}
+            onClick={() => openPaperEdition?.("evening")}
             className="block text-left text-amber-600/80"
           >
             📰 Akşam
           </button>
           <button
             type="button"
-            onClick={drinkTea}
+            onClick={() => drinkTea?.()}
             className="block text-left text-zinc-400"
           >
-            ☕ Çay ({teaStock}) · Enerji %{Math.round(ağaEnergy ?? 0)}
+            ☕ Çay ({teaStock ?? 0}) · Enerji %
+            {Math.round(ağaEnergy ?? 0)}
           </button>
+          {patronCalling && (
+            <Link
+              href="/shift"
+              className="block text-left text-amber-400 font-bold animate-pulse"
+            >
+              ⚠ Patron çağırdı
+            </Link>
+          )}
           {bankDebt > 0 && (
             <div className="text-red-400">Borç {formatMoney(bankDebt)}</div>
           )}
@@ -231,7 +278,14 @@ export default function GameLayout({
       </main>
 
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-zinc-800 bg-[#0D0D1A]/95 flex justify-around py-2">
-        {menuItems.slice(0, 5).map((item) => {
+        {[
+          menuItems[0],
+          menuItems[1],
+          menuItems[2],
+          menuItems[5],
+          menuItems[3],
+        ].map((item) => {
+          if (!item) return null;
           const active =
             pathname === item.href || pathname.startsWith(item.href + "/");
           const Icon = item.icon;
@@ -239,12 +293,15 @@ export default function GameLayout({
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center gap-0.5 px-1 ${
+              className={`flex flex-col items-center gap-0.5 px-1 relative ${
                 active ? "text-cyan-400" : "text-zinc-500"
               }`}
             >
               <Icon className="w-5 h-5" />
               <span className="text-[9px]">{item.label}</span>
+              {item.href === "/shift" && patronCalling && (
+                <span className="absolute top-0 right-1 w-1.5 h-1.5 bg-amber-500 rounded-full" />
+              )}
             </Link>
           );
         })}
