@@ -9,6 +9,7 @@ import {
 } from "@/store/gameStore";
 import { formatMoney } from "@/lib/utils";
 import { ROUTES } from "@/data/routes";
+import { sendPrice } from "@/lib/roomChannel";
 import { Route, Plus, Fuel, User } from "lucide-react";
 
 const FUEL_PRICE = 42;
@@ -24,6 +25,7 @@ export default function ExpeditionsPage() {
     buses,
     drivers,
     expeditions,
+    companyName,
     addExpedition,
     updateExpedition,
     settleExpeditionProfit,
@@ -77,6 +79,7 @@ export default function ExpeditionsPage() {
           if (Date.now() >= exp.departureTime) {
             st.updateExpedition(exp.id, { status: "departed", progress: 0 });
             if (exp.driverId) st.setDriverBusy(exp.driverId, true);
+            if (exp.muavinId) st.setDriverBusy(exp.muavinId, true);
             return;
           }
           const r =
@@ -84,9 +87,11 @@ export default function ExpeditionsPage() {
               (x) =>
                 x.origin === exp.origin && x.destination === exp.destination
             ) || route;
-          const maxPrice = Math.round((r?.distance || 400) * 2.1 * st.priceCapMultiplier());
+          const maxPrice = Math.round(
+            (r?.distance || 400) * 2.1 * st.priceCapMultiplier()
+          );
           const ratio = exp.ticketPrice / maxPrice;
-          let chance =
+          const chance =
             Math.max(0.12, 0.82 - ratio * 0.7) * st.crierBonus();
           if (Math.random() < chance && exp.soldTickets < exp.maxSeats) {
             const add = ratio < 0.4 ? 2 + Math.floor(Math.random() * 3) : 1;
@@ -120,10 +125,7 @@ export default function ExpeditionsPage() {
 
           st.updateExpedition(exp.id, { progress: prog, log: logs });
 
-          // Seyrek olay (her 1.5sn tick'te düşük şans)
-          if (Math.random() < 0.08) {
-            st.rollRoadEvent(exp);
-          }
+          if (Math.random() < 0.08) st.rollRoadEvent(exp);
 
           if (elapsed > driveMs) {
             const b = st.buses.find((x) => x.id === exp.busId);
@@ -131,22 +133,17 @@ export default function ExpeditionsPage() {
               ((r?.distance || 400) / 100) * (b?.fuelUse || 28) * FUEL_PRICE
             );
             const cat =
-              exp.soldTickets *
-              (CATERING_INFO[exp.catering]?.perSeat || 10);
+              exp.soldTickets * (CATERING_INFO[exp.catering]?.perSeat || 10);
             const mu = b?.muavinCost || 400;
             let revenue = exp.soldTickets * exp.ticketPrice;
             if (exp.smuggle) revenue += exp.smugglePaid || 10000;
             const cost = fuel + cat + mu;
             const profit = revenue - cost;
 
-            // İkram itibar
             const rep = CATERING_INFO[exp.catering]?.repMod || 0;
             if (rep !== 0) {
               useGameStore.setState((s) => ({
-                reputation: Math.max(
-                  0,
-                  Math.min(100, s.reputation + rep)
-                ),
+                reputation: Math.max(0, Math.min(100, s.reputation + rep)),
               }));
             }
 
@@ -160,6 +157,8 @@ export default function ExpeditionsPage() {
               st.setDriverBusy(exp.driverId, false);
               st.addFatigue(exp.driverId, 18 + Math.floor(Math.random() * 12));
             }
+            if (exp.muavinId) st.setDriverBusy(exp.muavinId, false);
+
             const drv = st.drivers.find((d) => d.id === exp.driverId);
             st.setLastTicket({
               expId: exp.id,
@@ -188,11 +187,25 @@ export default function ExpeditionsPage() {
   const handleCreate = () => {
     if (!bus || !route) return;
     if (!driverId) {
-      alert("Boşta şoför seç (seferde olan veya çok yorgun olamaz).");
+      alert("Boşta şoför seç.");
       return;
     }
     if (ticketPrice < minP || ticketPrice > maxP) {
       alert(`Bilet ${minP}–${maxP} ₺`);
+      return;
+    }
+
+    const busBusy = expeditions.some(
+      (e) =>
+        e.busId === bus.id &&
+        (e.status === "filling" || e.status === "departed")
+    );
+    if (busBusy) {
+      alert("Bu otobüs zaten seferde / peronda.");
+      return;
+    }
+    if (bus.repairingUntil && bus.repairingUntil > Date.now()) {
+      alert("Araç tamirde.");
       return;
     }
     if (bus.impoundedUntil && bus.impoundedUntil > Date.now()) {
@@ -202,10 +215,9 @@ export default function ExpeditionsPage() {
 
     const smugglePaid = smuggle ? 10000 : 0;
     if (smuggle) {
-      // peşin mafya ödemesi
       useGameStore.getState().addMoney(smugglePaid);
       useGameStore.getState().addLedger("Mafya bagaj payı (peşin)", smugglePaid);
-      pushPhone("İsimsiz", "Yük bindi ağa. Yolun açık olsun… dikkat et.");
+      pushPhone("İsimsiz", "Yük bindi ağa. Yolun açık olsun…");
     }
 
     addExpedition({
@@ -230,6 +242,15 @@ export default function ExpeditionsPage() {
       smugglePaid,
     });
     setDriverBusy(driverId, true);
+    if (muavinId) setDriverBusy(muavinId, true);
+
+    // Lobi nabzı (oda açıksa)
+    void sendPrice(
+      companyName || "Firma",
+      `${route.origin} → ${route.destination}`,
+      ticketPrice
+    );
+
     setShowForm(false);
     setSmuggle(false);
   };
@@ -245,11 +266,7 @@ export default function ExpeditionsPage() {
               <p className="text-sm text-zinc-400">{lastEvent.description}</p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={clearLastEvent}
-            className="mt-2 text-xs text-zinc-500"
-          >
+          <button type="button" onClick={clearLastEvent} className="mt-2 text-xs text-zinc-500">
             Kapat
           </button>
         </div>
@@ -262,20 +279,14 @@ export default function ExpeditionsPage() {
             Seferler
           </h1>
           <p className="text-sm text-zinc-500 mt-1">
-            {bayramActive && (
-              <span className="text-red-400 mr-2">Bayram — tavan yüksek</span>
-            )}
-            {rivalWeak && (
-              <span className="text-emerald-400">Rakip zayıf — fiyat +</span>
-            )}
+            1 otobüs = 1 sefer · {bayramActive && <span className="text-red-400">Bayram </span>}
+            {rivalWeak && <span className="text-emerald-400">Rakip zayıf</span>}
           </p>
         </div>
         <button
           type="button"
           onClick={() => {
-            setMafiaLine(
-              MAFIA_LINES[Math.floor(Math.random() * MAFIA_LINES.length)]
-            );
+            setMafiaLine(MAFIA_LINES[Math.floor(Math.random() * MAFIA_LINES.length)]!);
             setShowForm(true);
           }}
           className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-black font-medium rounded-xl"
@@ -308,16 +319,32 @@ export default function ExpeditionsPage() {
                 onChange={(e) => setBusId(e.target.value)}
                 className="mt-1 w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2"
               >
-                {buses.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name} · {b.plate}
-                  </option>
-                ))}
+                {buses.map((b) => {
+                  const busy = expeditions.some(
+                    (e) =>
+                      e.busId === b.id &&
+                      (e.status === "filling" || e.status === "departed")
+                  );
+                  const repair = b.repairingUntil && b.repairingUntil > Date.now();
+                  const imp = b.impoundedUntil && b.impoundedUntil > Date.now();
+                  return (
+                    <option
+                      key={b.id}
+                      value={b.id}
+                      disabled={busy || !!repair || !!imp}
+                    >
+                      {b.name} · {b.plate}
+                      {busy ? " (seferde)" : ""}
+                      {repair ? " (tamir)" : ""}
+                      {imp ? " (bağlı)" : ""}
+                    </option>
+                  );
+                })}
               </select>
             </label>
             <label className="text-sm block">
               <span className="text-zinc-500 text-xs flex items-center gap-1">
-                <User className="w-3 h-3" /> Şoför (boşta)
+                <User className="w-3 h-3" /> Şoför
               </span>
               <select
                 value={driverId}
@@ -333,7 +360,7 @@ export default function ExpeditionsPage() {
               </select>
             </label>
             <label className="text-sm block">
-              <span className="text-zinc-500 text-xs">Muavin (opsiyonel)</span>
+              <span className="text-zinc-500 text-xs">Muavin</span>
               <select
                 value={muavinId}
                 onChange={(e) => setMuavinId(e.target.value)}
@@ -358,69 +385,56 @@ export default function ExpeditionsPage() {
                 className="mt-1 w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2"
               />
             </label>
+            <div className="text-xs text-zinc-500 flex items-end gap-1 pb-2">
+              <Fuel className="w-3 h-3" /> Tahmini mazot {formatMoney(fuelEst)}
+            </div>
           </div>
 
           <div>
-            <div className="text-xs text-zinc-500 mb-2">İkram (maliyet / itibar)</div>
+            <div className="text-xs text-zinc-500 mb-2">İkram</div>
             <div className="flex flex-wrap gap-2">
               {(Object.keys(CATERING_INFO) as Catering[]).map((k) => (
                 <button
                   key={k}
                   type="button"
                   onClick={() => setCatering(k)}
-                  className={`text-left px-3 py-2 rounded-lg border text-xs max-w-[200px] ${
+                  className={`px-3 py-1.5 rounded-lg text-xs border ${
                     catering === k
-                      ? "border-amber-500 bg-amber-500/10 text-amber-300"
-                      : "border-zinc-700 text-zinc-400"
+                      ? "border-amber-500 bg-amber-500/10"
+                      : "border-zinc-700"
                   }`}
                 >
-                  <div className="font-medium">{CATERING_INFO[k].label}</div>
-                  <div className="text-[10px] opacity-80">
-                    {formatMoney(CATERING_INFO[k].perSeat)}/koltuk · itibar{" "}
-                    {CATERING_INFO[k].repMod >= 0 ? "+" : ""}
-                    {CATERING_INFO[k].repMod}
-                  </div>
+                  {CATERING_INFO[k].label} · {CATERING_INFO[k].perSeat}₺/koltuk
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Mafya / kaçak */}
-          <div className="border border-red-900/50 bg-red-950/20 rounded-xl p-4">
-            <div className="text-xs text-red-400 font-semibold mb-1">
-              Kara bagaj teklifi
-            </div>
-            <p className="text-sm text-stone-400 italic mb-3">“{mafiaLine}”</p>
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input
-                type="checkbox"
-                checked={smuggle}
-                onChange={(e) => setSmuggle(e.target.checked)}
-              />
-              <span>
-                Kabul et — peşin ₺10.000 · jandarma riski yüksek
-              </span>
-            </label>
-          </div>
-
-          <div className="text-xs text-zinc-500 flex items-center gap-2">
-            <Fuel className="w-4 h-4 text-amber-400" />
-            Mazot ~{formatMoney(fuelEst)} · Dolum x{crierBonus().toFixed(2)}{" "}
-            (çığırtkan)
-          </div>
+          <label className="flex items-start gap-2 text-xs text-zinc-400">
+            <input
+              type="checkbox"
+              checked={smuggle}
+              onChange={(e) => setSmuggle(e.target.checked)}
+            />
+            <span>
+              Riskli bagaj (+10.000 peşin, jandarma riski)
+              <br />
+              <span className="text-zinc-600">{mafiaLine}</span>
+            </span>
+          </label>
 
           <div className="flex gap-2">
             <button
               type="button"
               onClick={handleCreate}
-              className="px-6 py-2.5 bg-amber-500 text-black font-semibold rounded-lg"
+              className="px-5 py-2.5 bg-amber-500 text-black font-semibold rounded-xl text-sm"
             >
-              Seferi başlat
+              Seferi aç
             </button>
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="px-6 py-2.5 border border-zinc-600 rounded-lg"
+              className="px-4 py-2 text-xs text-zinc-500"
             >
               İptal
             </button>
@@ -430,67 +444,29 @@ export default function ExpeditionsPage() {
 
       <div className="space-y-3">
         {expeditions.length === 0 && (
-          <p className="text-zinc-600 text-center py-12 text-sm">
-            Sefer yok. Şoför al → sefer kur.
-          </p>
+          <p className="text-sm text-zinc-600">Henüz sefer yok.</p>
         )}
-        {expeditions.map((exp) => {
-          const drv = drivers.find((d) => d.id === exp.driverId);
-          return (
-            <div
-              key={exp.id}
-              className="bg-zinc-900 border border-zinc-800 rounded-xl p-4"
-            >
-              <div className="flex flex-wrap justify-between gap-2">
-                <div>
-                  <div className="font-medium">
-                    {exp.origin} → {exp.destination}
-                  </div>
-                  <div className="text-xs text-zinc-500 mt-1">
-                    {exp.soldTickets}/{exp.maxSeats} · {formatMoney(exp.ticketPrice)}{" "}
-                    · {drv?.name || "—"}
-                    {exp.smuggle && (
-                      <span className="text-red-400 ml-2">kaçak yük</span>
-                    )}
-                  </div>
-                </div>
-                <div className="text-xs">
-                  {exp.status === "filling" && (
-                    <span className="text-sky-400">
-                      Kalkış{" "}
-                      {Math.max(
-                        0,
-                        Math.ceil((exp.departureTime - Date.now()) / 1000)
-                      )}
-                      s
-                    </span>
-                  )}
-                  {exp.status === "departed" && (
-                    <span className="text-amber-400">
-                      Yolda %{Math.round((exp.progress || 0) * 100)}
-                    </span>
-                  )}
-                  {exp.status === "completed" && (
-                    <span className="text-emerald-400">Bitti</span>
-                  )}
-                </div>
-              </div>
-              {exp.status === "departed" && (
-                <>
-                  <div className="mt-2 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-amber-500 transition-all"
-                      style={{ width: `${(exp.progress || 0) * 100}%` }}
-                    />
-                  </div>
-                  <p className="text-[10px] text-zinc-500 mt-1">
-                    {(exp.log || []).slice(-1)[0]}
-                  </p>
-                </>
-              )}
+        {expeditions.map((exp) => (
+          <div
+            key={exp.id}
+            className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-sm"
+          >
+            <div className="font-medium">
+              {exp.origin} → {exp.destination}
             </div>
-          );
-        })}
+            <div className="text-xs text-zinc-500 mt-1">
+              {exp.status} · {exp.soldTickets}/{exp.maxSeats} bilet ·{" "}
+              {exp.ticketPrice} ₺
+              {exp.status === "departed" &&
+                ` · %${Math.round((exp.progress || 0) * 100)}`}
+            </div>
+            {(exp.log || []).length > 0 && (
+              <div className="text-[11px] text-zinc-600 mt-1">
+                {(exp.log || []).slice(-2).join(" · ")}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );
