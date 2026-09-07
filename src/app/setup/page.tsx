@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useGameStore, CITIES } from "@/store/gameStore";
+import { useCareerStore } from "@/store/careerStore";
 import { formatMoney } from "@/lib/utils";
 import { MapPin, Stamp, FileText } from "lucide-react";
 
@@ -11,6 +13,10 @@ export default function SetupPage() {
   const balance = useGameStore((s) => s.balance);
   const setupDone = useGameStore((s) => s.setupDone);
   const completeCitySetup = useGameStore((s) => s.completeCitySetup);
+  const careerDone = useCareerStore((s) => s.careerDone);
+  const rank = useCareerStore((s) => s.rank);
+  const savings = useCareerStore((s) => s.savings);
+  const displayHitap = useCareerStore((s) => s.displayHitap);
 
   const [cityId, setCityId] = useState("ankara");
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -18,10 +24,32 @@ export default function SetupPage() {
 
   const city = CITIES.find((c) => c.id === cityId)!;
   const total = city.plotCost + city.licenseCost;
+  const canFound = careerDone || rank === "bagimsiz";
 
   if (setupDone) {
     if (typeof window !== "undefined") router.replace("/map");
     return null;
+  }
+
+  if (!canFound) {
+    return (
+      <div className="min-h-screen bg-[#1a1410] text-stone-200 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-stone-900 border border-stone-700 rounded-xl p-6 text-center">
+          <h1 className="text-lg font-bold text-amber-400">Henüz terminal yok</h1>
+          <p className="text-sm text-stone-400 mt-3 leading-relaxed">
+            {displayHitap || "Çırak"}, önce peronda büyü. Rütbe{" "}
+            <strong>Bağımsız esnaf</strong> veya istifa ile çıkış şart.
+            Birikim: {savings} ₺
+          </p>
+          <Link
+            href="/shift"
+            className="mt-6 inline-block w-full py-3 rounded-xl bg-amber-500 text-black font-bold text-sm"
+          >
+            Vardiyaya dön
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   const approve = () => {
@@ -29,8 +57,18 @@ export default function SetupPage() {
       alert("Belediye mührü zorunlu");
       return;
     }
+    // Çırak birikimini kasaya aktar (bir kez)
+    const c = useCareerStore.getState();
+    if (c.savings > 0) {
+      useGameStore.getState().addMoney(c.savings);
+      useGameStore.getState().addLedger("Çırak birikimi", c.savings);
+      useCareerStore.setState({ savings: 0 });
+    }
+    if (c.displayHitap) {
+      useGameStore.getState().setPlayerName(c.playerName);
+    }
     if (!completeCitySetup(cityId)) {
-      alert("Kasa yetersiz");
+      alert("Kasa yetersiz — arsa+ruhsat için para lazım");
       return;
     }
     router.replace("/map");
@@ -50,7 +88,7 @@ export default function SetupPage() {
                 Terminal hangi ilde?
               </h1>
               <p className="text-sm text-stone-500">
-                Ofisin yıldızı bu ilde sabitlenir. Sürüş modu sonra açılacak.
+                Perondan çıktın. Kendi yazıhaneni kur.
               </p>
               <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
                 {CITIES.map((c) => (
@@ -100,17 +138,23 @@ export default function SetupPage() {
                   <span>TOPLAM</span>
                   <span>{formatMoney(total)}</span>
                 </div>
-                <div className="text-xs text-stone-500">Kasa: {formatMoney(balance)}</div>
+                <div className="text-xs text-stone-500">
+                  Kasa: {formatMoney(balance)} · Birikim aktarılacak:{" "}
+                  {formatMoney(savings)}
+                </div>
               </div>
               <div className="flex gap-2">
-                <button type="button" onClick={() => setStep(1)} className="flex-1 py-2 border border-stone-600 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className="flex-1 py-2 border border-stone-600 rounded-lg"
+                >
                   Geri
                 </button>
                 <button
                   type="button"
                   onClick={() => setStep(3)}
-                  disabled={balance < total}
-                  className="flex-1 py-2 bg-amber-500 text-black font-semibold rounded-lg disabled:opacity-40"
+                  className="flex-1 py-2 bg-amber-500 text-black font-semibold rounded-lg"
                 >
                   Belge
                 </button>
@@ -127,7 +171,7 @@ export default function SetupPage() {
                   TERMİNAL İŞLETME İZNİ
                 </div>
                 <p>
-                  {city.name} ilinde arsa tahsisi ve ruhsat onaylanmıştır. Bedel{" "}
+                  {city.name} ilinde arsa tahsisi ve ruhsat. Bedel{" "}
                   {formatMoney(total)}.
                 </p>
               </div>

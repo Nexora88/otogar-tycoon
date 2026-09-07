@@ -7,34 +7,61 @@ export default function HowToPlayPage() {
         <Link href="/" className="text-xs text-cyan-500">
           ← Ana sayfa
         </Link>
-        <h1 className="text-3xl font-bold mt-4 mb-6">Nasıl oynanır?</h1>
-        <ol className="space-y-6 text-sm text-zinc-400 leading-relaxed list-decimal list-inside">
-          <li>
-            <strong className="text-white">Terminal kur</strong> — İl seç, belediye
-            mührü bas, arsa ve ruhsat öde.
+        <p className="text-[10px] tracking-[0.3em] text-amber-500/80 uppercase mt-6">
+          Rehber · 1987
+        </p>
+        <h1 className="text-3xl font-bold mt-2 mb-2">Nasıl oynanır?</h1>
+        <p className="text-sm text-zinc-500 mb-8 leading-relaxed">
+          Direkt terminal kurmazsın. Önce başka firmanın peronunda çırak olursun;
+          büyüyünce kendi yazıhaneni açarsın.
+        </p>
+
+        <ol className="space-y-6 text-sm text-zinc-400 leading-relaxed">
+          <li className="border-l-2 border-amber-700 pl-4">
+            <strong className="text-white">1. Ad & memleket</strong>
+            <br />
+            Hitap oluşur (ör. Keşanlı Ahmet). Rastgele şehir + firma + patron.
           </li>
-          <li>
-            <strong className="text-white">Kadro al</strong> — Şoför / muavin
-            mülakatı. İstersen eski firmayı ara (istihbarat).
+          <li className="border-l-2 border-amber-700 pl-4">
+            <strong className="text-white">2. Vardiya</strong>
+            <br />
+            Sabah çay/gazete, akşam kasa, gece risk. Patron çağırınca yanına git.
+            Seçeneklerin güven, birikim ve yorgunluğu etkiler.
           </li>
-          <li>
-            <strong className="text-white">Sefer planla</strong> — Hat, bilet, ikram.
-            Bir şoför aynı anda tek seferde olur.
+          <li className="border-l-2 border-amber-700 pl-4">
+            <strong className="text-white">3. Rütbe</strong>
+            <br />
+            Çırak → Yamak → Muavin → … → Bağımsız. İstifa için yeterli birikim
+            veya rütbe gerekir.
           </li>
-          <li>
-            <strong className="text-white">Ofis</strong> — Vergi, kredi, gazete
-            (sabah/akşam), not defteri, çay.
+          <li className="border-l-2 border-cyan-700 pl-4">
+            <strong className="text-white">4. Terminal</strong>
+            <br />
+            Belediye mührü, arsa, ruhsat. Birikim kasaya aktarılır.
           </li>
-          <li>
-            <strong className="text-white">Risk</strong> — Yorgun şoför, kaçak bagaj,
-            müfettiş, mafya haraç. Dengeli oyna.
+          <li className="border-l-2 border-cyan-700 pl-4">
+            <strong className="text-white">5. Sefer</strong>
+            <br />
+            Hat, bilet, ikram, şoför. <strong className="text-zinc-300">1 otobüs = 1 sefer</strong>.
+            Yolda EDS, çevirme, jandarma olabilir.
+          </li>
+          <li className="border-l-2 border-cyan-700 pl-4">
+            <strong className="text-white">6. Lobi</strong>
+            <br />
+            Oda kodu, X paylaş, sohbet, bilet nabzı (Supabase açıksa canlı).
           </li>
         </ol>
+
+        <div className="mt-10 p-4 rounded-xl border border-zinc-800 bg-zinc-950 text-xs text-zinc-500">
+          Gerçek para yoktur. Küfür ve siyasi içerik yasaktır. Misafir süre
+          sınırlıdır; ilerlemeyi saklamak için hesap önerilir.
+        </div>
+
         <Link
           href="/play"
-          className="inline-block mt-10 px-6 py-3 rounded-xl bg-cyan-500 text-black font-semibold text-sm"
+          className="inline-block mt-8 px-6 py-3 rounded-xl bg-amber-500 text-black font-semibold text-sm"
         >
-          Oyuna başla
+          Perona yazıl
         </Link>
       </div>
     </div>
