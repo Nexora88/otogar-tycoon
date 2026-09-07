@@ -672,7 +672,10 @@ export const useGameStore = create<GameState>()(
         const selectedEvent = selected;
         if (!selectedEvent) return null;
 
-        const event: RoadEvent = { id: `evt-${Date.now()}`, ...selectedEvent };
+        const event: RoadEvent = {
+          id: `evt-${Date.now()}`,
+          ...(selectedEvent as Omit<RoadEvent, "id">),
+        };
         set((s) => ({
           lastEvent: event,
           balance: s.balance + event.moneyChange,
