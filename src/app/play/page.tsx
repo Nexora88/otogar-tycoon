@@ -1,51 +1,44 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useGameStore } from "@/store/gameStore";
 import { useCareerStore } from "@/store/careerStore";
-import Link from "next/link";
 
 export default function PlayPage() {
   const router = useRouter();
-  const params = useSearchParams();
   const forceRegister = useGameStore((s) => s.forceRegister);
   const isGuest = useGameStore((s) => s.isGuest);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const guest = params.get("guest") === "1";
-    if (guest) {
-      useGameStore.setState({ isGuest: true });
-    }
-
     const g = useGameStore.getState();
     const c = useCareerStore.getState();
 
-    // Misafir 5 gün doldu
+    // Misafir süresi doldu → ekranda kal
     if (g.isGuest && g.forceRegister) {
+      setReady(true);
       return;
     }
 
-    // Kariyer bitmemiş → vardiya
     if (c.careerStarted && !c.careerDone) {
       router.replace("/shift");
       return;
     }
 
-    // Kariyer hiç başlamadı
     if (!c.careerStarted) {
       router.replace("/shift");
       return;
     }
 
-    // Bağımsız ama setup yok
     if (!g.setupDone) {
       router.replace("/setup");
       return;
     }
 
     router.replace("/dashboard");
-  }, [router, params]);
+  }, [router]);
 
   if (isGuest && forceRegister) {
     return (
@@ -77,7 +70,7 @@ export default function PlayPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-zinc-500 text-sm">
-      Yükleniyor…
+      {ready ? "Yönlendiriliyor…" : "Yükleniyor…"}
     </div>
   );
 }
