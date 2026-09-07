@@ -23,9 +23,7 @@ export default function LoginPage() {
 
     try {
       if (!isSupabaseConfigured()) {
-        setErr(
-          "Supabase yapılandırılmadı. Vercel env kontrol et veya misafir oyna."
-        );
+        setErr("Supabase yok. Kayıt veya misafir dene.");
         setLoading(false);
         return;
       }
@@ -42,17 +40,24 @@ export default function LoginPage() {
         return;
       }
 
+      const meta = data.user?.user_metadata || {};
       const name =
-        (data.user?.user_metadata?.display_name as string) ||
+        (meta.display_name as string) ||
         data.user?.email?.split("@")[0] ||
-        "Şirket";
+        "Kaptan";
+      const firm =
+        (meta.company_name as string) || name;
 
-      setCompanyName(name);
       setPlayerName(name);
+      setCompanyName(firm);
+      useGameStore.setState({
+        isGuest: false,
+        forceRegister: false,
+      });
       setLoading(false);
       router.push("/play");
     } catch {
-      setErr("Bağlantı hatası. Tekrar dene.");
+      setErr("Bağlantı hatası.");
       setLoading(false);
     }
   };
@@ -65,9 +70,7 @@ export default function LoginPage() {
       >
         <h1 className="text-xl font-bold text-white mb-1">Giriş</h1>
         <p className="text-xs text-zinc-500 mb-6">
-          {isSupabaseConfigured()
-            ? "Hesabınla devam et"
-            : "Supabase env eksik — kayıt yine yerel çalışır"}
+          Hesabınla devam · misafir limiti yok
         </p>
 
         <input
@@ -92,8 +95,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-2.5 rounded-xl font-semibold text-sm text-[#0D0D1A] disabled:opacity-50"
-          style={{ background: "linear-gradient(90deg,#00F0FF,#007BFF)" }}
+          className="w-full py-2.5 rounded-xl font-semibold text-sm text-black bg-gradient-to-r from-cyan-400 to-blue-500 disabled:opacity-50"
         >
           {loading ? "…" : "Giriş yap"}
         </button>
@@ -103,7 +105,7 @@ export default function LoginPage() {
             Hesap oluştur
           </Link>
           {" · "}
-          <Link href="/play" className="text-zinc-500">
+          <Link href="/play?guest=1" className="text-zinc-500">
             Misafir
           </Link>
         </p>
