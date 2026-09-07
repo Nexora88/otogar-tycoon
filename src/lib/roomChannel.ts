@@ -19,6 +19,8 @@ export type RoomHandlers = {
   onChat?: (m: ChatMsg) => void;
   onPrice?: (p: PricePulse) => void;
   onPresence?: (count: number) => void;
+  onAuction?: (a: AuctionBid) => void;
+  onSabotage?: (s: SabotagePing) => void;
 };
 
 let channel: RealtimeChannel | null = null;
@@ -55,6 +57,12 @@ export async function joinRoomChannel(
     })
     .on("broadcast", { event: "price" }, ({ payload }) => {
       handlers.onPrice?.(payload as PricePulse);
+    })
+    .on("broadcast", { event: "auction" }, ({ payload }) => {
+      handlers.onAuction?.(payload as AuctionBid);
+    })
+    .on("broadcast", { event: "sabotage" }, ({ payload }) => {
+      handlers.onSabotage?.(payload as SabotagePing);
     })
     .on("presence", { event: "sync" }, () => {
       const state = channel?.presenceState() || {};
@@ -115,6 +123,47 @@ export async function sendPrice(
     type: "broadcast",
     event: "price",
     payload: p,
+  });
+  return true;
+}
+export type AuctionBid = {
+  peron: string;
+  bidder: string;
+  amount: number;
+  at: number;
+};
+
+export type SabotagePing = {
+  from: string;
+  target: string;
+  kind: "ariza" | "yakit";
+  at: number;
+};
+
+export async function sendAuctionBid(
+  peron: string,
+  bidder: string,
+  amount: number
+) {
+  if (!channel) return false;
+  await channel.send({
+    type: "broadcast",
+    event: "auction",
+    payload: { peron, bidder, amount, at: Date.now() } satisfies AuctionBid,
+  });
+  return true;
+}
+
+export async function sendSabotage(
+  from: string,
+  target: string,
+  kind: "ariza" | "yakit"
+) {
+  if (!channel) return false;
+  await channel.send({
+    type: "broadcast",
+    event: "sabotage",
+    payload: { from, target, kind, at: Date.now() } satisfies SabotagePing,
   });
   return true;
 }
