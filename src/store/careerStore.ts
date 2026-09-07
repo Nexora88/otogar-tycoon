@@ -15,13 +15,52 @@ import {
   randomAbiName,
   hitap,
   nextRank,
-  rankThreshold,
   RANK_LABEL,
   JOB_OFFERS,
   MAFIA_HEADLINES,
   MEMLEKET_HITAP,
 } from "@/data/apprenticeContent";
 import { getGlobalGameClock } from "@/lib/gameTime";
+
+/** Terfi eşikleri — oynanabilir tempo */
+export function rankNeed(r: CareerRank): {
+  trust: number;
+  fame: number;
+  savings: number;
+  tasks: number;
+} {
+  switch (r) {
+    case "cirak":
+      return { trust: 0, fame: 0, savings: 0, tasks: 0 };
+    case "yamak":
+      return { trust: 10, fame: 3, savings: 800, tasks: 6 };
+    case "muavin":
+      return { trust: 22, fame: 10, savings: 3500, tasks: 14 };
+    case "kaptan_yamagi":
+      return { trust: 38, fame: 20, savings: 12000, tasks: 24 };
+    case "bagimsiz":
+      return { trust: 50, fame: 32, savings: 28000, tasks: 36 };
+  }
+}
+
+function wageFor(rank: CareerRank): number {
+  switch (rank) {
+    case "cirak":
+      return 35;
+    case "yamak":
+      return 55;
+    case "muavin":
+      return 90;
+    case "kaptan_yamagi":
+      return 130;
+    case "bagimsiz":
+      return 0;
+  }
+}
+
+function clamp(n: number, a: number, b: number) {
+  return Math.max(a, Math.min(b, n));
+}
 
 export interface CareerState {
   careerStarted: boolean;
@@ -39,6 +78,9 @@ export interface CareerState {
   fame: number;
   savings: number;
   fatigue: number;
+  tasksDone: number;
+  shiftsDone: number;
+  lastTaskDay: number;
   shiftBand: ShiftBand;
   shiftLabelText: string;
   tasks: WorkTask[];
@@ -49,11 +91,15 @@ export interface CareerState {
   mafiaWhisper: string | null;
   log: string[];
 
+  /** Terminal kurulabilir mi? */
+  canFoundTerminal: () => boolean;
+
   startCareer: (name: string, memleket: string) => void;
   syncShiftFromClock: () => void;
   rollShiftTasks: () => void;
   openTask: (id: string) => void;
   resolveOption: (opt: DialogueOption) => void;
+  rest: () => void;
   triggerPatronCall: () => void;
   answerPatronCall: () => void;
   ignorePatronCall: () => void;
@@ -62,12 +108,9 @@ export interface CareerState {
   refuseJobOffer: () => void;
   resign: () => void;
   tryPromote: () => boolean;
+  markIndependent: () => void;
   clearOutcome: () => void;
   pushLog: (line: string) => void;
-}
-
-function clamp(n: number, a: number, b: number) {
-  return Math.max(a, Math.min(b, n));
 }
 
 export const useCareerStore = create<CareerState>()(
@@ -84,10 +127,13 @@ export const useCareerStore = create<CareerState>()(
       abi2Name: "",
       workCity: "İstanbul",
       rank: "cirak",
-      trust: 8,
+      trust: 10,
       fame: 0,
-      savings: 400,
-      fatigue: 10,
+      savings: 500,
+      fatigue: 0,
+      tasksDone: 0,
+      shiftsDone: 0,
+      lastTaskDay: -1,
       shiftBand: "morning",
       shiftLabelText: "Sabah vardiyası",
       tasks: [],
@@ -98,31 +144,41 @@ export const useCareerStore = create<CareerState>()(
       mafiaWhisper: null,
       log: [],
 
+      canFoundTerminal: () => {
+        const s = get();
+        return s.careerDone || s.rank === "bagimsiz";
+      },
+
       pushLog: (line) =>
-        set((s) => ({ log: [line, ...s.log].slice(0, 40) })),
+        set((s) => ({ log: [line, ...s.log].slice(0, 50) })),
 
       startCareer: (name, memleket) => {
-        const n = name.trim().slice(0, 20) || "Çırak";
+        const n = name.trim().slice(0, 24) || "Çırak";
         const mem =
           memleket.trim() ||
           MEMLEKET_HITAP[Math.floor(Math.random() * MEMLEKET_HITAP.length)]!;
+
+        const near: Record<string, string[]> = {
+          Keşanlı: ["Edirne", "İstanbul", "Tekirdağ"],
+          Edirneli: ["Edirne", "İstanbul"],
+          Samsunlu: ["Samsun", "İstanbul", "Ankara"],
+          Trabzonlu: ["Samsun", "Trabzon", "Ankara"],
+          Ankaralı: ["Ankara", "İstanbul"],
+          İzmirli: ["İzmir", "İstanbul"],
+          Adanalı: ["Adana", "Ankara", "İstanbul"],
+          Bursalı: ["Bursa", "İstanbul"],
+        };
+        const pool = near[mem] || ["İstanbul", "Ankara", "İzmir"];
+        const workCity =
+          Math.random() > 0.4
+            ? "İstanbul"
+            : pool[Math.floor(Math.random() * pool.length)]!;
+
         const company = randomCompany();
         const patron = randomPatronName();
         const abi = randomAbiName();
-        const abi2 = randomAbiName();
-        const cities = [
-          "İstanbul",
-          "Ankara",
-          "İzmir",
-          "Bursa",
-          "Adana",
-          "Samsun",
-          "Edirne",
-        ];
-        const workCity =
-          Math.random() > 0.35
-            ? "İstanbul"
-            : cities[Math.floor(Math.random() * cities.length)]!;
+        let abi2 = randomAbiName();
+        if (abi2 === abi) abi2 = randomAbiName();
 
         set({
           careerStarted: true,
@@ -136,10 +192,13 @@ export const useCareerStore = create<CareerState>()(
           abi2Name: abi2,
           workCity,
           rank: "cirak",
-          trust: 8,
+          trust: 10,
           fame: 0,
-          savings: 400,
-          fatigue: 10,
+          savings: 500,
+          fatigue: 0,
+          tasksDone: 0,
+          shiftsDone: 0,
+          lastTaskDay: -1,
           tasks: [],
           activeTask: null,
           lastOutcome: null,
@@ -147,8 +206,9 @@ export const useCareerStore = create<CareerState>()(
           jobOffer: null,
           mafiaWhisper: null,
           log: [
-            `${workCity} · ${company}. Patron: ${patron}. Abi: ${abi}.`,
-            `Hitap: ${hitap(mem, n)}. Vardiyaya yazıldın.`,
+            `${workCity} · ${company}`,
+            `Patron ${patron} · ${abi} / ${abi2}`,
+            `Hitap: ${hitap(mem, n)}. Perona yazıldın.`,
           ],
         });
         get().syncShiftFromClock();
@@ -167,26 +227,44 @@ export const useCareerStore = create<CareerState>()(
       rollShiftTasks: () => {
         const s = get();
         if (!s.careerStarted || s.careerDone) return;
+
         get().syncShiftFromClock();
+        const clock = getGlobalGameClock();
+
+        // Aynı oyun gününde tekrar basınca liste yenilenir ama yorgunluk artar
+        if (s.lastTaskDay === clock.gameDay && s.tasks.length > 0) {
+          set((st) => ({
+            fatigue: clamp(st.fatigue + 4, 0, 100),
+            lastOutcome: "Aynı gün ikinci vardiya — yorgunluk arttı.",
+          }));
+        }
+
+        const abi = Math.random() > 0.5 ? s.abiName : s.abi2Name;
         const tasks = generateShiftTasks({
           band: get().shiftBand,
           patronName: s.patronName,
-          abiName: Math.random() > 0.5 ? s.abiName : s.abi2Name,
-          count: 3,
+          abiName: abi,
+          count: s.fatigue > 70 ? 2 : 3,
         });
-        set({ tasks, activeTask: null });
+
+        set({
+          tasks,
+          activeTask: null,
+          lastTaskDay: clock.gameDay,
+          shiftsDone: s.shiftsDone + 1,
+        });
         get().pushLog(
-          `${get().shiftLabelText}: ${tasks.length} iş yazıldı.`
+          `${get().shiftLabelText}: ${tasks.length} iş · yorgunluk %${Math.round(get().fatigue)}`
         );
-        if (Math.random() > 0.72) get().triggerPatronCall();
-        if (Math.random() > 0.85) get().rollJobOffer();
-        if (Math.random() > 0.9) {
+
+        if (Math.random() > 0.65) get().triggerPatronCall();
+        if (Math.random() > 0.82) get().rollJobOffer();
+        if (Math.random() > 0.88) {
           const h =
             MAFIA_HEADLINES[
               Math.floor(Math.random() * MAFIA_HEADLINES.length)
             ]!;
           set({ mafiaWhisper: h });
-          get().pushLog(`Fısıltı / manşet: ${h}`);
         }
       },
 
@@ -199,28 +277,37 @@ export const useCareerStore = create<CareerState>()(
         const task = get().activeTask;
         if (!task) return;
 
-        let caught = false;
-        const fatigueBonus = get().fatigue / 200;
-        const risk = Math.min(0.85, opt.risk + fatigueBonus);
+        const s0 = get();
+        const fatigueRisk = s0.fatigue / 180;
+        const risk = Math.min(0.9, opt.risk + fatigueRisk);
 
-        if (opt.tone === "crooked" && Math.random() < risk) {
-          caught = true;
-        }
-        if (task.kind === "rusvet" && opt.id.includes("snitch") && Math.random() < 0.4) {
+        let caught = false;
+        if (opt.tone === "crooked" && Math.random() < risk) caught = true;
+        if (
+          task.kind === "rusvet" &&
+          opt.label.toLowerCase().includes("patron") &&
+          Math.random() < 0.45
+        ) {
           caught = true;
         }
 
         let trustD = opt.trustDelta;
         let moneyD = opt.moneyDelta;
         let fameD = 0;
+        const baseWage = wageFor(s0.rank);
 
         if (caught) {
-          trustD = -8;
-          moneyD = -Math.abs(opt.moneyDelta) - 30;
-          fameD = -2;
+          trustD = -10;
+          moneyD = -Math.abs(opt.moneyDelta) - 40;
+          fameD = -3;
         } else {
-          if (opt.tone === "obedient") fameD += Math.random() > 0.7 ? 1 : 0;
+          moneyD += baseWage;
+          if (opt.tone === "obedient") {
+            trustD += 0;
+            fameD += Math.random() > 0.75 ? 1 : 0;
+          }
           if (opt.tone === "honest") fameD += 1;
+          if (task.kind === "pis" && opt.tone === "obedient") trustD += 1;
         }
 
         const line = outcomeFor(opt.tone, caught);
@@ -230,22 +317,37 @@ export const useCareerStore = create<CareerState>()(
           trust: clamp(s.trust + trustD, 0, 100),
           fame: clamp(s.fame + fameD, 0, 100),
           savings: Math.max(0, s.savings + moneyD),
-          fatigue: clamp(s.fatigue + (opt.tone === "lazy" ? 2 : 6), 0, 100),
+          fatigue: clamp(
+            s.fatigue + (opt.tone === "lazy" ? 3 : 7) + (caught ? 5 : 0),
+            0,
+            100
+          ),
+          tasksDone: s.tasksDone + 1,
           tasks: s.tasks.filter((t) => t.id !== task.id),
           activeTask: null,
-          lastOutcome: `${speaker}: “${line}”`,
+          lastOutcome: `${speaker}: “${line}”${
+            !caught && baseWage > 0 ? ` · +${baseWage + Math.max(0, opt.moneyDelta)} ₺` : ""
+          }`,
           log: [
-            `[${task.kind}] ${opt.label} → ${line}`,
+            `[${task.kind}] ${opt.label} → ${caught ? "YAKALANDI" : "ok"}`,
             ...s.log,
-          ].slice(0, 40),
+          ].slice(0, 50),
         }));
 
         get().tryPromote();
       },
 
+      rest: () => {
+        set((s) => ({
+          fatigue: clamp(s.fatigue - 25, 0, 100),
+          lastOutcome: "Köşede 10 dk oturdun. Biraz toparlandın.",
+        }));
+      },
+
       triggerPatronCall: () => {
+        if (get().careerDone) return;
         set({ patronCalling: true });
-        get().pushLog("PATRON ÇAĞIRDI — yazıhaneye.");
+        get().pushLog("PATRON ÇAĞIRDI");
       },
 
       answerPatronCall: () => {
@@ -261,24 +363,22 @@ export const useCareerStore = create<CareerState>()(
           activeTask: task,
           trust: clamp(s.trust + 1, 0, 100),
         });
-        get().pushLog("Yazıhaneye girdin.");
       },
 
       ignorePatronCall: () => {
         set((s) => ({
           patronCalling: false,
-          trust: clamp(s.trust - 4, 0, 100),
-          fatigue: clamp(s.fatigue + 3, 0, 100),
-          lastOutcome: `${s.patronName}: “Seni iki saattir arıyorum. Gözüm üstünde.”`,
+          trust: clamp(s.trust - 5, 0, 100),
+          lastOutcome: `${s.patronName}: “İki saattir yoksun. Gözüm üstünde.”`,
         }));
-        get().pushLog("Çağrıyı yok saydın. Güven düştü.");
       },
 
       rollJobOffer: () => {
+        if (get().rank === "cirak" && get().tasksDone < 5) return;
         const offer =
           JOB_OFFERS[Math.floor(Math.random() * JOB_OFFERS.length)]!;
         set({ jobOffer: offer });
-        get().pushLog(`İş teklifi: ${offer.company}`);
+        get().pushLog(`Teklif: ${offer.company}`);
       },
 
       acceptJobOffer: () => {
@@ -289,57 +389,84 @@ export const useCareerStore = create<CareerState>()(
           companyName: o.company,
           patronName: randomPatronName(),
           abiName: randomAbiName(),
-          trust: 12,
-          fame: clamp(s.fame + 5, 0, 100),
-          lastOutcome: `${o.company}: “Yarın peronda ol. Yeni sayfa.”`,
+          abi2Name: randomAbiName(),
+          trust: clamp(Math.max(12, s.trust - 5), 0, 100),
+          fame: clamp(s.fame + 4, 0, 100),
+          lastOutcome: `${o.company}: “Yarın peronda. Yeni sayfa.”`,
         }));
-        get().pushLog(`Teklif kabul: ${o.company}`);
         get().rollShiftTasks();
       },
 
       refuseJobOffer: () => {
         set((s) => ({
           jobOffer: null,
-          trust: clamp(s.trust + 2, 0, 100),
+          trust: clamp(s.trust + 3, 0, 100),
           lastOutcome: `${s.patronName}: “Sadakat unutulmaz.”`,
         }));
-        get().pushLog("Teklif reddedildi.");
       },
 
       resign: () => {
-        set((s) => ({
+        const s = get();
+        const okRank =
+          s.rank === "muavin" ||
+          s.rank === "kaptan_yamagi" ||
+          s.rank === "bagimsiz";
+        const okMoney = s.savings >= 12000;
+
+        if (!okRank && !okMoney) {
+          set({
+            lastOutcome: `${s.patronName}: “Cebin boş, rütben düşük. Biraz daha çalış.”`,
+          });
+          return;
+        }
+
+        set({
           careerDone: true,
+          rank: s.rank === "bagimsiz" ? "bagimsiz" : s.rank,
           lastOutcome: `${s.patronName}: “Kapı orada. Peron unutmaz.”`,
-          log: ["İstifa ettin. Kendi yolun başlıyor.", ...s.log],
-        }));
+          log: [
+            "İstifa — terminal kurma hakkı açıldı.",
+            ...s.log,
+          ].slice(0, 50),
+        });
       },
 
       tryPromote: () => {
         const s = get();
         const nxt = nextRank(s.rank);
         if (!nxt) return false;
-        const need = rankThreshold(nxt);
+        const need = rankNeed(nxt);
         if (
           s.trust >= need.trust &&
           s.fame >= need.fame &&
-          s.savings >= need.savings
+          s.savings >= need.savings &&
+          s.tasksDone >= need.tasks
         ) {
           set({
             rank: nxt,
-            lastOutcome: `Rütbe: ${RANK_LABEL[nxt]}. Peron seni konuşuyor.`,
+            lastOutcome: `Terfi: ${RANK_LABEL[nxt]}`,
           });
-          get().pushLog(`Terfi: ${RANK_LABEL[nxt]}`);
+          get().pushLog(`Terfi → ${RANK_LABEL[nxt]}`);
           if (nxt === "bagimsiz") {
-            set({ careerDone: true });
-            get().pushLog("Bağımsız esnaf — kendi işin açılabilir.");
+            get().markIndependent();
           }
           return true;
         }
         return false;
       },
 
+      markIndependent: () => {
+        set({
+          careerDone: true,
+          rank: "bagimsiz",
+          lastOutcome:
+            "Bağımsız esnaf oldun. Belediyeden terminal ruhsatı alabilirsin.",
+        });
+        get().pushLog("Bağımsız — /setup açık");
+      },
+
       clearOutcome: () => set({ lastOutcome: null, mafiaWhisper: null }),
     }),
-    { name: "otogar-career-v1" }
+    { name: "otogar-career-v2" }
   )
 );
