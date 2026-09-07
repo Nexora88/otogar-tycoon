@@ -669,9 +669,10 @@ export const useGameStore = create<GameState>()(
         tryPick(pAccident, ACCIDENT_POOL);
         tryPick(pFunny, FUNNY_POOL);
         tryPick(pWeather, WEATHER_POOL);
-        if (!selected) return null;
+        const selectedEvent = selected;
+        if (!selectedEvent) return null;
 
-        const event: RoadEvent = { id: `evt-${Date.now()}`, ...selected };
+        const event: RoadEvent = { id: `evt-${Date.now()}`, ...selectedEvent };
         set((s) => ({
           lastEvent: event,
           balance: s.balance + event.moneyChange,

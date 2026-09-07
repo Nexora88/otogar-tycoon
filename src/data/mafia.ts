@@ -1,143 +1,196 @@
-export type MafiaKind = "hakiki" | "sahte";
+export type MafiaTier = "hakiki" | "sahte";
 
-export interface MafiaBoss {
+export interface RegionalBoss {
   id: string;
-  kind: MafiaKind;
-  bossName: string;
   region: string;
-  cityIds: string[];
-  cost: number;
-  messageTemplate: string;
+  cities: string[];
+  bossName: string;
+  tier: MafiaTier;
+  weeklyFee: number;
+  message: string;
+  refuseLine: string;
+  payLine: string;
 }
 
-export const MAFIA_BOSSES: MafiaBoss[] = [
+export const BOSSES: RegionalBoss[] = [
   {
-    id: "kel_niyazi",
-    kind: "hakiki",
-    bossName: "Trakya Mafyası — Kel Niyazi",
+    id: "trakya",
     region: "Trakya",
-    cityIds: ["edirne", "istanbul"],
-    cost: 5000,
-    messageTemplate:
-      "{name}… Trakya toprağında izinsiz teker dönmez. Kel Niyazi’nin sözü net: her hafta {cost} ₺. Yoksa gece otoparkta alev görürsün. Bu son nazik konuşmamız.",
+    cities: ["Edirne", "Tekirdağ", "Keşan", "İstanbul"],
+    bossName: "Kel Niyazi",
+    tier: "hakiki",
+    weeklyFee: 5000,
+    message:
+      "Trakya toprağında teker dönsün istiyorsan, Kel Niyazi’nin selamıyla haftalık koruma konuşulur. Büyük balığa yem olma.",
+    refuseLine: "Kapı çalınır… otopark sessiz kalmaz.",
+    payLine: "Bu hafta sakin. Yolun açık.",
   },
   {
-    id: "cemil_amca",
-    kind: "hakiki",
-    bossName: "Ankara Çemberi — Cemil Amca",
+    id: "marmara",
+    region: "Marmara",
+    cities: ["İstanbul", "Bursa", "Balıkesir", "Çanakkale"],
+    bossName: "Kartal Rıza",
+    tier: "hakiki",
+    weeklyFee: 7000,
+    message:
+      "Kartal Rıza abimiz peronları sever. Aidat düzenliyse farların yanar.",
+    refuseLine: "Gece lastik sesi duyarsın.",
+    payLine: "Defter temiz. Dokunulmazsın… şimdilik.",
+  },
+  {
+    id: "ic",
     region: "İç Anadolu",
-    cityIds: ["ankara"],
-    cost: 5500,
-    messageTemplate:
-      "{name}, başkentte kimse amcasız oturmaz. Cemil Amca selam gönderdi: {cost} ₺ yazıhane payı. Gecikme, manşet ve yangın aynı zarfta gelir.",
+    cities: ["Ankara", "Eskişehir", "Konya", "Kayseri", "Sivas"],
+    bossName: "Cemil Amca",
+    tier: "hakiki",
+    weeklyFee: 5500,
+    message:
+      "Cemil Amca’nın kapısı ağır açılır. Yazıhane aidatı peşin sevilir.",
+    refuseLine: "Sabah gazetede ismin yanabilir.",
+    payLine: "Amca memnun. Çayın soğumasın.",
   },
   {
-    id: "kartal_riza",
-    kind: "hakiki",
-    bossName: "Ege Hattı — Kartal Rıza",
+    id: "ege",
     region: "Ege",
-    cityIds: ["izmir"],
-    cost: 4800,
-    messageTemplate:
-      "İzmir rüzgârı yüzünü keser {name}. Kartal Rıza’nın hesabı: {cost} ₺. Ödemezsen peron senin olmaz, enkaz senin olur.",
+    cities: ["İzmir", "Manisa", "Aydın", "Muğla", "Denizli"],
+    bossName: "Kordon Yılmaz",
+    tier: "hakiki",
+    weeklyFee: 6000,
+    message:
+      "Kordon tarafı kargaşa sevmez. Haftalık düzen, sefer düzen.",
+    refuseLine: "Garaj kapısı boyanır… kötü anlamda.",
+    payLine: "Deniz gibi sakin bu hafta.",
   },
   {
-    id: "yilmaz_usta",
-    kind: "hakiki",
-    bossName: "Akdeniz Kolu — Yılmaz",
+    id: "akdeniz",
     region: "Akdeniz",
-    cityIds: ["antalya", "adana"],
-    cost: 5200,
-    messageTemplate:
-      "{name}, sahil sıcak ama hesap soğuk. Yılmaz’ın teklifi tek: {cost} ₺. Reddet, sabah küllerini süpürürsün.",
+    cities: ["Antalya", "Adana", "Mersin", "Hatay"],
+    bossName: "Liman Salih",
+    tier: "hakiki",
+    weeklyFee: 5800,
+    message:
+      "Liman Salih bagajı da sever, aidatı da. Konuşalım mi?",
+    refuseLine: "Tır parkı alev alabilir.",
+    payLine: "Liman net. Geç.",
   },
   {
-    id: "ramo",
-    kind: "hakiki",
-    bossName: "Karadeniz Bağı — Ramo",
+    id: "karadeniz",
     region: "Karadeniz",
-    cityIds: ["samsun"],
-    cost: 4500,
-    messageTemplate:
-      "Samsun çıkışı dar {name}. Ramo konuşuyor: {cost} ₺ koruma. Yoksa lastik değil, filon yanar.",
+    cities: ["Samsun", "Trabzon", "Zonguldak"],
+    bossName: "Sisli Orhan",
+    tier: "hakiki",
+    weeklyFee: 4800,
+    message:
+      "Sisli Orhan’ın sesi kısık çıkar. Anlayan anlar.",
+    refuseLine: "Yağmurda lastik patlar… tesadüf denir.",
+    payLine: "Sis dağıldı. Devam.",
   },
   {
-    id: "hasan_aga",
-    kind: "hakiki",
-    bossName: "Doğu Kapısı — Hasan Ağa",
+    id: "dogu",
     region: "Doğu",
-    cityIds: ["erzurum"],
-    cost: 4200,
-    messageTemplate:
-      "{name}, dağ uzun, sabır kısa. Hasan Ağa’nın şartı: {cost} ₺. Söz dinlemeyenin yolu kışta biter.",
+    cities: ["Erzurum", "Van", "Malatya"],
+    bossName: "Dağlı Behçet",
+    tier: "hakiki",
+    weeklyFee: 4500,
+    message:
+      "Dağlı Behçet uzun yolu bilir. Koruma parası da bilir.",
+    refuseLine: "Kış erken gelir senin için.",
+    payLine: "Yol açık, kar kapalı değil.",
   },
   {
-    id: "peron_selim",
-    kind: "sahte",
-    bossName: "Peron Faresi Selim ve Çetesi",
-    region: "Her yer",
-    cityIds: [],
-    cost: 1500,
-    messageTemplate:
-      "Dinle {name}! Bu otogarın haracı bize akar. {cost} ₺ yoksa yazıhaneyi basarız, bittin sen, her şeyi yakarız!",
+    id: "guneydogu",
+    region: "Güneydoğu",
+    cities: ["Diyarbakır", "Gaziantep", "Şanlıurfa"],
+    bossName: "Sıfır Nuri",
+    tier: "hakiki",
+    weeklyFee: 5200,
+    message:
+      "Sıfır Nuri rakamı net sever. Haftalık net olsun.",
+    refuseLine: "Otoparkta sıfır kalır araç.",
+    payLine: "Hesap kapandı. Selam söyleme.",
+  },
+  // Sahte kabadayılar
+  {
+    id: "sahte_selim",
+    region: "Peron",
+    cities: [],
+    bossName: "Peron Faresi Selim",
+    tier: "sahte",
+    weeklyFee: 1500,
+    message:
+      "Biz bu otogarın haracını yeriz! Vermezsen yazıhaneni basarız!",
+    refuseLine: "…bir daha mesaj atamaz. Boş çıktı.",
+    payLine: "Parayı kaptı, kayboldu. Sahteymiş.",
   },
   {
-    id: "caki_metin",
-    kind: "sahte",
-    bossName: "Çakı Metin’in Yedileri",
-    region: "Her yer",
-    cityIds: [],
-    cost: 1200,
-    messageTemplate:
-      "{name}, adım Çakı Metin. {cost} ₺ kapıya. Yoksa peronda kanlı burun, kırık cam — seç beğen!",
-  },
-  {
-    id: "kupon_ali",
-    kind: "sahte",
-    bossName: "Kupon Ali",
-    region: "Her yer",
-    cityIds: [],
-    cost: 900,
-    messageTemplate:
-      "Ağa {name}, ben bu terminalin belasıyım! {cost} ₺ çabuk. Vermezsen… gömersin işini, haberin olsun!",
+    id: "sahte_ramo",
+    region: "Peron",
+    cities: [],
+    bossName: "Bagaj Ramo ve Çetesi",
+    tier: "sahte",
+    weeklyFee: 2000,
+    message:
+      "Bittin sen! Kundaklarız! Hemen yatır!",
+    refuseLine: "Blöf. Ertesi gün çay ocağında yoklar.",
+    payLine: "Aldılar kaçtılar. Gerçek mafya değilmiş.",
   },
 ];
 
-export const HARASS_LINES = [
-  "{name}, saat işliyor. Cevap yok, sabır da yok.",
-  "Çayın soğudu. Borcun ısındı.",
-  "Plakanı ezberledik {name}. Gece otopark ıssız olur.",
-  "Yarın gazete senin adınla açılır. Bugün kurtulursun.",
-  "Kapıyı çaldık, açmadın. Sonraki ziyaret camdan olur.",
-  "Kaptanların uykusu kaçmasın diye hatırlatıyoruz.",
-  "Üç gündür sessizlik {name}. Sessizlik pahalıdır.",
-  "Küçük balık büyük balığa yol verir. Sen hangisisin?",
-  "Yazıhane ışığı yanıyor. Biz de uyanığız.",
-  "Bu son nazik mesaj olabilir.",
-  "Aidat yoksa alev var. Basit matematik.",
-  "Peronda adın dönüyor — iyi anlamda değil.",
-  "Çorba parası kavramını severiz. İnkarı sevmek zor.",
-  "Racon kitaptan okunmaz. Peronda yazılır.",
-  "Bugün kapıdan geldik. Yarın başka yerden geliriz.",
-];
-
-export const RACON_DELIKANLI =
-  "Biz bu peronlara tırnaklarımızla kazıyarak geldik. Çakalların sözüyle ağalık masası devrilmez. Hadi naş!";
-
-export const RACON_ESNAF =
-  "Kaptan, biz de bu toprağın esnafıyız. Düzen istiyorsanız buyurun çorba paranız — hesabı kapatalım.";
-
-export function fillTemplate(t: string, name: string, cost: number): string {
-  return t.replace(/\{name\}/g, name).replace(/\{cost\}/g, String(cost));
+export function pickBossForCity(cityName: string): RegionalBoss {
+  const hit = BOSSES.filter(
+    (b) =>
+      b.tier === "hakiki" &&
+      b.cities.some((c) =>
+        cityName.toLowerCase().includes(c.toLowerCase().slice(0, 4))
+      )
+  );
+  if (hit.length && Math.random() > 0.25) {
+    return hit[Math.floor(Math.random() * hit.length)]!;
+  }
+  // %35 sahte
+  if (Math.random() > 0.65) {
+    const fake = BOSSES.filter((b) => b.tier === "sahte");
+    return fake[Math.floor(Math.random() * fake.length)]!;
+  }
+  return BOSSES.filter((b) => b.tier === "hakiki")[
+    Math.floor(Math.random() * 8)
+  ]!;
 }
 
-export function pickBossForCity(cityId: string | null): MafiaBoss {
-  const regional = MAFIA_BOSSES.filter(
-    (b) => b.kind === "hakiki" && cityId && b.cityIds.includes(cityId)
-  );
-  const fake = MAFIA_BOSSES.filter((b) => b.kind === "sahte");
-  if (Math.random() < 0.55 || regional.length === 0) {
-    return fake[Math.floor(Math.random() * fake.length)];
-  }
-  return regional[Math.floor(Math.random() * regional.length)];
-  }
+export function fillPlayer(msg: string, playerName: string) {
+  return msg.replace(/\{name\}/g, playerName || "Kaptan");
+}
+
+export const MAFIA_NEWS_PAY = [
+  (boss: string, city: string) =>
+    ({
+      headline: `${city}: “koruma” dedikodusu`,
+      body: `${boss} adı fısıldanıyor. Resmi açıklama yok.`,
+    }) as const,
+];
+
+export const MAFIA_NEWS_FIRE = [
+  (plate: string, company: string) =>
+    ({
+      headline: `KUNDAK ŞÜPHESİ: ${plate}`,
+      body: `${company} otoparkında gece yangını. Esnaf “mesaj” diyor, polis “soruşturma”.`,
+    }) as const,
+  (plate: string, company: string) =>
+    ({
+      headline: `Alev alan otobüs: ${plate}`,
+      body: `${company} filosunda hasar. Tanık yok, kamera bulanık.`,
+    }) as const,
+];
+
+export const MAFIA_NEWS_VISIT = [
+  (boss: string) =>
+    ({
+      headline: `Çay ocağında ağır isim: ${boss}`,
+      body: "Yazıhane kapıları erken kapandı. Esnaf dilini yuttu.",
+    }) as const,
+  (boss: string) =>
+    ({
+      headline: `${boss} selamı peronda`,
+      body: "Kimse net konuşmuyor. Aidat kelimesi havada.",
+    }) as const,
+];
