@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import {
-  pickBossForCity,
+  pickMafiaBoss,
   fillTemplate,
   HARASS_LINES,
   RACON_DELIKANLI,
   RACON_ESNAF,
   type MafiaBoss,
 } from "@/data/mafia";
+import { useGameStore, CITIES } from "@/store/gameStore";
 
 type Phase = "closed" | "knock" | "talk" | "result";
 
@@ -17,27 +18,58 @@ export default function MafiaModal() {
   const [boss, setBoss] = useState<MafiaBoss | null>(null);
   const [known, setKnown] = useState(false);
   const [result, setResult] = useState("");
-  const [playerName] = useState("Ağa");
 
-  // Periyodik kapı çalma (demo — store bağlanınca oradan da tetiklenir)
+  const playerName = useGameStore((s) => s.playerName);
+  const homeCityId = useGameStore((s) => s.homeCityId);
+  const mafiaDebtDue = useGameStore((s) => s.mafiaDebtDue);
+  const activeBoss = useGameStore((s) => s.activeBoss);
+  const setupDone = useGameStore((s) => s.setupDone);
+  const balance = useGameStore((s) => s.balance);
+  const payMafia = useGameStore((s) => s.payMafia);
+  const refuseMafia = useGameStore((s) => s.refuseMafia);
+  const mafiaVisit = useGameStore((s) => s.mafiaVisit);
+  const spendMoney = useGameStore((s) => s.spendMoney);
+  const addLedger = useGameStore((s) => s.addLedger);
+
+  const cityName =
+    CITIES.find((c) => c.id === homeCityId)?.name || "İstanbul";
+
+  // Store’dan aidat geldiyse modal aç
   useEffect(() => {
+    if (mafiaDebtDue && activeBoss && phase === "closed") {
+      setBoss({
+        ...activeBoss,
+        kind: activeBoss.tier,
+        cost: activeBoss.weeklyFee,
+        messageTemplate: activeBoss.message,
+      });
+      setKnown(false);
+      setPhase("knock");
+    }
+  }, [mafiaDebtDue, activeBoss, phase]);
+
+  // Demo / seyrek rastgele (setup sonrası)
+  useEffect(() => {
+    if (!setupDone) return;
     const t = setInterval(() => {
-      if (phase !== "closed") return;
-      if (Math.random() > 0.92) {
-        const b = pickBossForCity(null);
-        setBoss(b);
-        setKnown(false);
-        setPhase("knock");
+      if (phase !== "closed" || mafiaDebtDue) return;
+      if (Math.random() > 0.94) {
+        mafiaVisit();
       }
-    }, 45000);
+    }, 60000);
     return () => clearInterval(t);
-  }, [phase]);
+  }, [phase, setupDone, mafiaDebtDue, mafiaVisit]);
 
   if (phase === "closed" || !boss) return null;
 
-  const msg = fillTemplate(boss.messageTemplate, playerName, boss.cost);
+  const msg = fillTemplate(boss.messageTemplate, playerName || "Ağa", boss.cost);
 
   const intel = () => {
+    if (!spendMoney(500)) {
+      setResult("İstihbarat için 500 ₺ yok.");
+      return;
+    }
+    addLedger("İstihbarat", -500);
     setKnown(true);
     setResult(
       boss.kind === "hakiki"
@@ -47,28 +79,51 @@ export default function MafiaModal() {
   };
 
   const pay = () => {
+    // Store’a boss yazılı değilse yaz
+    if (!activeBoss) {
+      useGameStore.setState({
+        activeBoss: boss,
+        mafiaDebtDue: true,
+      });
+    }
+    const ok = payMafia();
     setResult(
-      `${boss.bossName}: “Akıllı esnaf. Bu hafta yazıhanen sakin. Çayın benden.”`
+      ok
+        ? `${boss.bossName}: “${boss.payLine}”`
+        : `Kasa yetmedi (${boss.cost} ₺). Bakiye: ${balance} ₺`
     );
     setPhase("result");
   };
 
   const raconHard = () => {
     if (boss.kind === "sahte") {
+      useGameStore.setState({ mafiaDebtDue: false, activeBoss: null });
       setResult(
         `${RACON_DELIKANLI}\n\n${boss.bossName}: “T-tamam ağa… yanlış anlama… biz de şaka… gideriz.”\n\nBedava kurtuldun.`
       );
     } else {
+      if (!activeBoss) {
+        useGameStore.setState({ activeBoss: boss, mafiaDebtDue: true });
+      }
+      refuseMafia();
       setResult(
-        `${RACON_DELIKANLI}\n\n${boss.bossName}: “Racon senin olsun ${playerName}. Biz de raconumuzu gece yazarız.”\n\nRisk: otopark / kundak tehdidi aktif.`
+        `${RACON_DELIKANLI}\n\n${boss.bossName}: “Racon senin olsun ${playerName || "Ağa"}. Biz de raconumuzu gece yazarız.”\n\n${boss.refuseLine}`
       );
     }
     setPhase("result");
   };
 
   const raconSoft = () => {
+    const fee = Math.min(boss.cost, Math.max(800, Math.floor(boss.cost * 0.4)));
+    if (!spendMoney(fee)) {
+      setResult("Çorba parası için kasa yetmedi.");
+      setPhase("result");
+      return;
+    }
+    addLedger("Çorba parası", -fee);
+    useGameStore.setState({ mafiaDebtDue: false, activeBoss: null });
     setResult(
-      `${RACON_ESNAF}\n\n${boss.bossName}: “Anlaştık kaptan. Çorba parası hesabı kapatır. Yolun açık.”`
+      `${RACON_ESNAF}\n\n${boss.bossName}: “Anlaştık kaptan. ${fee} ₺ ile defter kapandı. Yolun açık.”`
     );
     setPhase("result");
   };
@@ -76,8 +131,21 @@ export default function MafiaModal() {
   const ignore = () => {
     const line = HARASS_LINES[
       Math.floor(Math.random() * HARASS_LINES.length)
-    ].replace(/\{name\}/g, playerName);
-    setResult(`${boss.bossName}: “${line}”\n\nKapıyı kapattın. Taciz sürebilir.`);
+    ]!.replace(/\{name\}/g, playerName || "Ağa");
+    if (boss.kind === "hakiki") {
+      if (!activeBoss) {
+        useGameStore.setState({ activeBoss: boss, mafiaDebtDue: true });
+      }
+      refuseMafia();
+      setResult(
+        `${boss.bossName}: “${line}”\n\nKapıyı kapattın. ${boss.refuseLine}`
+      );
+    } else {
+      useGameStore.setState({ mafiaDebtDue: false, activeBoss: null });
+      setResult(
+        `${boss.bossName}: “${line}”\n\nBlöf. Bir süre taciz mesajı gelebilir.`
+      );
+    }
     setPhase("result");
   };
 
@@ -87,7 +155,7 @@ export default function MafiaModal() {
         {phase === "knock" && (
           <>
             <div className="text-[10px] tracking-widest text-amber-500 font-bold">
-              TAK TAK TAK
+              TAK TAK TAK · {cityName}
             </div>
             <h2 className="text-lg font-bold text-white mt-2">
               Yazıhane kapısı çalındı
@@ -115,7 +183,8 @@ export default function MafiaModal() {
         {phase === "talk" && (
           <>
             <div className="text-[10px] tracking-widest text-red-400 font-bold">
-              YAZIHANE KAPISI
+              {boss.region.toUpperCase()} ·{" "}
+              {boss.kind === "hakiki" ? "AĞIR" : "ŞÜPHELİ"}
             </div>
             <h2 className="text-lg font-bold text-white mt-1">
               {boss.bossName}
@@ -141,7 +210,7 @@ export default function MafiaModal() {
                 onClick={intel}
                 className="w-full py-2 text-xs rounded-lg border border-amber-800 text-amber-200 disabled:opacity-40"
               >
-                İstihbarat al (₺500 — demo)
+                İstihbarat al (₺500)
               </button>
               <button
                 type="button"
@@ -189,6 +258,7 @@ export default function MafiaModal() {
                 setPhase("closed");
                 setBoss(null);
                 setResult("");
+                setKnown(false);
               }}
               className="mt-5 w-full py-2.5 rounded-xl bg-cyan-500 text-black font-semibold text-sm"
             >
@@ -199,4 +269,4 @@ export default function MafiaModal() {
       </div>
     </div>
   );
-                }
+}
