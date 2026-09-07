@@ -6,8 +6,10 @@ import { useEffect, useState } from "react";
 import { useGameStore } from "@/store/gameStore";
 import { useCareerStore, RANK_LABEL } from "@/store/careerStore";
 import { TelsizTicker } from "@/components/TelsizTicker";
+import { RadioPanel } from "@/components/RadioPanel";
 import NewspaperModal from "@/components/NewspaperModal";
 import PhoneUI from "@/components/PhoneUI";
+import MafiaModal from "@/components/MafiaModal";
 import { formatMoney } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -27,7 +29,6 @@ const NAV: {
   href: string;
   label: string;
   icon: React.ElementType;
-  /** true = sadece ağa (careerDone) */
   tycoonOnly?: boolean;
 }[] = [
   { href: "/shift", label: "Vardiya", icon: Briefcase },
@@ -48,6 +49,7 @@ export default function GameLayout({
   children: React.ReactNode;
 }) {
   const path = usePathname();
+
   const balance = useGameStore((s) => s.balance);
   const reputation = useGameStore((s) => s.reputation);
   const companyName = useGameStore((s) => s.companyName);
@@ -56,6 +58,8 @@ export default function GameLayout({
   const paperNotify = useGameStore((s) => s.paperNotify);
   const mafiaDebtDue = useGameStore((s) => s.mafiaDebtDue);
   const activeBoss = useGameStore((s) => s.activeBoss);
+  const bankDebt = useGameStore((s) => s.bankDebt);
+  const taxDue = useGameStore((s) => s.taxDue);
   const openNewspaper = useGameStore((s) => s.openNewspaper);
   const openPaperEdition = useGameStore((s) => s.openPaperEdition);
   const tickGameTime = useGameStore((s) => s.tickGameTime);
@@ -68,8 +72,10 @@ export default function GameLayout({
   const savings = useCareerStore((s) => s.savings);
 
   const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
     setMounted(true);
+    tickGameTime();
     const id = setInterval(() => tickGameTime(), 4000);
     return () => clearInterval(id);
   }, [tickGameTime]);
@@ -78,8 +84,7 @@ export default function GameLayout({
 
   return (
     <div className="min-h-screen bg-[#0a0c10] text-zinc-100 flex flex-col md:flex-row">
-      {/* Sidebar desktop */}
-      <aside className="hidden md:flex w-56 flex-col border-r border-zinc-800/80 bg-zinc-950/90">
+      <aside className="hidden md:flex w-56 flex-col border-r border-zinc-800/80 bg-zinc-950/90 shrink-0">
         <div className="p-4 border-b border-zinc-800">
           <div className="text-[10px] tracking-[0.2em] text-amber-600 font-bold">
             OTOGAR TYCOON
@@ -92,14 +97,14 @@ export default function GameLayout({
           </div>
           {isCirak && (
             <div className="mt-2 text-[10px] px-2 py-1 rounded bg-amber-950/50 text-amber-400 border border-amber-900/40">
-              {RANK_LABEL[rank]} · birikim {savings} ₺
+              {RANK_LABEL[rank]} · {savings} ₺
             </div>
           )}
         </div>
 
-        <nav className="flex-1 p-2 space-y-0.5">
+        <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
           {NAV.map((item) => {
-            const locked = item.tycoonOnly && isCirak;
+            const locked = Boolean(item.tycoonOnly && isCirak);
             const active = path.startsWith(item.href);
             const Icon = item.icon;
             if (locked) {
@@ -111,7 +116,7 @@ export default function GameLayout({
                 >
                   <Icon className="w-4 h-4 opacity-40" />
                   {item.label}
-                  <span className="ml-auto text-[9px] opacity-50">🔒</span>
+                  <span className="ml-auto text-[9px]">🔒</span>
                 </div>
               );
             }
@@ -122,7 +127,7 @@ export default function GameLayout({
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors ${
                   active
                     ? "bg-amber-500/15 text-amber-300 border border-amber-700/40"
-                    : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
+                    : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 border border-transparent"
                 }`}
               >
                 <Icon className="w-4 h-4" />
@@ -133,6 +138,10 @@ export default function GameLayout({
         </nav>
 
         <TelsizTicker />
+
+        <div className="px-3 pb-2">
+          <RadioPanel compact />
+        </div>
 
         <div className="p-3 border-t border-zinc-800 space-y-2">
           <div className="flex justify-between text-xs">
@@ -145,6 +154,18 @@ export default function GameLayout({
             <span className="text-zinc-500">İtibar</span>
             <span className="text-cyan-400">{reputation}</span>
           </div>
+          {bankDebt > 0 && (
+            <div className="flex justify-between text-xs text-red-400/90">
+              <span>Banka borcu</span>
+              <span className="font-mono">{formatMoney(bankDebt)}</span>
+            </div>
+          )}
+          {taxDue > 0 && (
+            <div className="flex justify-between text-xs text-amber-500/90">
+              <span>Vergi</span>
+              <span className="font-mono">{formatMoney(taxDue)}</span>
+            </div>
+          )}
           <button
             type="button"
             onClick={() => openNewspaper()}
@@ -163,17 +184,21 @@ export default function GameLayout({
           >
             Telefon
           </button>
+          <Link
+            href="/office"
+            className="block text-center text-[10px] text-zinc-600 hover:text-zinc-400"
+          >
+            Ofis / borç öde
+          </Link>
         </div>
       </aside>
 
-      {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top bar mobile + desktop strip */}
-        <header className="sticky top-0 z-30 border-b border-zinc-800/80 bg-[#0a0c10]/95 backdrop-blur px-3 py-2 flex items-center gap-3">
+        <header className="sticky top-0 z-30 border-b border-zinc-800/80 bg-[#0a0c10]/95 backdrop-blur px-3 py-2 flex items-center gap-2 flex-wrap">
           <div className="md:hidden text-[10px] font-bold text-amber-600 tracking-widest">
             OTOGAR
           </div>
-          <div className="flex-1 text-xs text-zinc-500 truncate">
+          <div className="flex-1 text-xs text-zinc-500 truncate min-w-[8rem]">
             {mounted && (
               <>
                 Gün {gameDay} · {String(gameHour).padStart(2, "0")}:00 ·{" "}
@@ -183,6 +208,14 @@ export default function GameLayout({
               </>
             )}
           </div>
+          {bankDebt > 0 && (
+            <Link
+              href="/office"
+              className="text-[10px] px-2 py-1 rounded bg-red-950/80 border border-red-900 text-red-300"
+            >
+              Borç {formatMoney(bankDebt)}
+            </Link>
+          )}
           {mafiaDebtDue && (
             <Link
               href="/office"
@@ -204,7 +237,6 @@ export default function GameLayout({
 
         <main className="flex-1 overflow-auto pb-20 md:pb-6">{children}</main>
 
-        {/* Mobile nav */}
         <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-zinc-800 bg-zinc-950/95 backdrop-blur flex overflow-x-auto">
           {NAV.filter((n) => !n.tycoonOnly || !isCirak)
             .slice(0, 6)
@@ -229,6 +261,7 @@ export default function GameLayout({
 
       <NewspaperModal />
       <PhoneUI />
+      <MafiaModal />
     </div>
   );
 }

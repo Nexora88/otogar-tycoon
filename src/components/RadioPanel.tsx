@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   playRadioSting,
   playCrier,
   playStatic,
+  playHorn,
   radioLabel,
   setMuted,
   isMuted,
@@ -13,43 +14,71 @@ import {
 
 const CHANNELS: RadioChannelId[] = ["esnaf", "kral", "yurt"];
 
-const TRACK_FAKE: Record<RadioChannelId, string[]> = {
-  esnaf: ["Şiki Şiki Kaptan", "AŞTİ Realtime", "Kostak Muavin"],
-  kral: ["Taht Kurmuşsun Koltuğuma", "Rötar Blues", "Gece Seferi"],
-  yurt: ["Havasına Suyuna", "Neslin Baban", "Sulh ve Selamet Seferi"],
+const TRACKS: Record<RadioChannelId, string[]> = {
+  esnaf: ["Şiki Şiki Kaptan", "AŞTİ Realtime", "Kostak Muavin", "Çilli Travego"],
+  kral: ["Taht Kurmuşsun Koltuğuma", "Rötar Blues", "Gece Seferi", "Damar Hat"],
+  yurt: ["Havasına Suyuna", "Neslin Baban", "Sulh Seferi", "Ufuktaki Anıtkabir"],
 };
+
+/** Kendi marka reklamları — telif yok, metin + sting */
+const ADS = [
+  "Reklam: Bakraç Ticaret — geleceğin bilgisayarlı sistemleri, peronun aklı.",
+  "Reklam: Nexora Elektronik 1987 — yerli malı, herkes onu kullanmalı.",
+  "Reklam: Otogar Tycoon — yolcuların ve kaptanların hakiki dostu.",
+  "Reklam: Ahmet Bankacılık — esnaf kredisi, net faiz, net racon.",
+  "Reklam: Yurtta sulh, cihanda sulh — yolda da selamet.",
+];
 
 export function RadioPanel({ compact = false }: { compact?: boolean }) {
   const [ch, setCh] = useState<RadioChannelId>("esnaf");
   const [on, setOn] = useState(false);
-  const [mute, setMute] = useState(isMuted());
-  const [track, setTrack] = useState(TRACK_FAKE.esnaf[0]!);
+  const [mute, setMuteLocal] = useState(isMuted());
+  const [line, setLine] = useState("Kapalı");
+  const [isAd, setIsAd] = useState(false);
+  const tick = useRef(0);
+
+  useEffect(() => {
+    if (!on) return;
+    const id = setInterval(() => {
+      tick.current += 1;
+      // Her 3. dilimde reklam
+      if (tick.current % 3 === 0) {
+        setIsAd(true);
+        const ad = ADS[Math.floor(Math.random() * ADS.length)]!;
+        setLine(ad);
+        playStatic(100);
+        playRadioSting("yurt");
+      } else {
+        setIsAd(false);
+        const list = TRACKS[ch];
+        setLine("♪ " + list[Math.floor(Math.random() * list.length)]!);
+        playRadioSting(ch);
+      }
+    }, 22000);
+    return () => clearInterval(id);
+  }, [on, ch]);
 
   const power = () => {
     if (!on) {
-      playStatic(150);
+      playStatic(120);
       playRadioSting(ch);
       setOn(true);
-      const list = TRACK_FAKE[ch];
-      setTrack(list[Math.floor(Math.random() * list.length)]!);
+      setIsAd(false);
+      setLine("♪ " + TRACKS[ch][0]!);
     } else {
       setOn(false);
+      setLine("Kapalı");
     }
   };
 
   const switchCh = (id: RadioChannelId) => {
     setCh(id);
     if (on) {
-      playStatic(100);
+      playStatic(80);
       playRadioSting(id);
-      const list = TRACK_FAKE[id];
-      setTrack(list[Math.floor(Math.random() * list.length)]!);
+      setIsAd(false);
+      setLine("♪ " + TRACKS[id][0]!);
     }
-  };
-
-  const crier = () => {
-    playCrier();
-    playStatic(80);
   };
 
   return (
@@ -60,7 +89,7 @@ export function RadioPanel({ compact = false }: { compact?: boolean }) {
     >
       <div className="flex items-center justify-between gap-2">
         <div className="text-[10px] tracking-widest text-amber-600 font-bold">
-          RADYO
+          RADYO 87.5
         </div>
         <div className="flex gap-1">
           <button
@@ -76,7 +105,7 @@ export function RadioPanel({ compact = false }: { compact?: boolean }) {
             type="button"
             onClick={() => {
               const m = !mute;
-              setMute(m);
+              setMuteLocal(m);
               setMuted(m);
             }}
             className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400"
@@ -103,19 +132,33 @@ export function RadioPanel({ compact = false }: { compact?: boolean }) {
         ))}
       </div>
 
-      {on && (
-        <div className="mt-2 text-[10px] text-zinc-400 font-mono truncate">
-          ♪ {track}
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={crier}
-        className="mt-2 w-full text-[10px] py-1.5 rounded-lg border border-amber-900/50 text-amber-500/90 hover:bg-amber-950/30"
+      <div
+        className={`mt-2 text-[10px] font-mono leading-snug line-clamp-2 ${
+          isAd ? "text-amber-400/90" : "text-zinc-400"
+        }`}
       >
-        Çığırtkan düdüğü
-      </button>
+        {line}
+      </div>
+
+      <div className="flex gap-1 mt-2">
+        <button
+          type="button"
+          onClick={() => {
+            playCrier();
+            playStatic(60);
+          }}
+          className="flex-1 text-[10px] py-1 rounded-lg border border-amber-900/50 text-amber-500/90"
+        >
+          Çığırtkan
+        </button>
+        <button
+          type="button"
+          onClick={() => playHorn()}
+          className="flex-1 text-[10px] py-1 rounded-lg border border-zinc-700 text-zinc-400"
+        >
+          Korna
+        </button>
+      </div>
     </div>
   );
 }
