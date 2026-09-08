@@ -9,6 +9,15 @@ export default function TicketReceipt() {
 
   if (!lastTicket) return null;
 
+  const origin = String(lastTicket.origin ?? "");
+  const destination = String(lastTicket.destination ?? "");
+  const sold = Number(lastTicket.sold ?? 0);
+  const price = Number(lastTicket.price ?? 0);
+  const driverName = String(lastTicket.driverName ?? "Şoför");
+  const revenue = Number(lastTicket.revenue ?? 0);
+  const cost = Number(lastTicket.cost ?? 0);
+  const profit = Number(lastTicket.profit ?? 0);
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
       <div
@@ -22,17 +31,17 @@ export default function TicketReceipt() {
         </div>
         <div className="p-3 text-[11px] space-y-1">
           <div>
-            {lastTicket.origin} → {lastTicket.destination}
+            {origin} → {destination}
           </div>
-          <div>Yolcu: {lastTicket.sold} · Bilet: {formatMoney(lastTicket.price)}</div>
-          <div>Şoför: {lastTicket.driverName}</div>
+          <div>
+            Yolcu: {sold} · Bilet: {formatMoney(price)}
+          </div>
+          <div>Şoför: {driverName}</div>
           <div className="border-t border-dashed border-stone-400 pt-1 mt-1">
-            Hasılat: {formatMoney(lastTicket.revenue)}
+            Hasılat: {formatMoney(revenue)}
           </div>
-          <div>Gider: {formatMoney(lastTicket.cost)}</div>
-          <div className="font-bold">
-            Net: {formatMoney(lastTicket.profit)}
-          </div>
+          <div>Gider: {formatMoney(cost)}</div>
+          <div className="font-bold">Net: {formatMoney(profit)}</div>
         </div>
         <div className="p-2 text-center text-[9px] text-stone-500 border-t border-dashed">
           *** İyi yolculuklar ***
