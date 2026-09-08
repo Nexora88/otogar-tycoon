@@ -85,3 +85,22 @@ body {
 .btn-press:active {
   transform: scale(0.97);
 }
+/* Ulusal coşku */
+.ot-mood-national {
+  --ot-accent: #f59e0b;
+}
+.ot-mood-national body,
+body.ot-mood-national {
+  background: #0c0a06 !important;
+}
+
+/* 10 Kasım yas */
+.ot-mood-mourning {
+  filter: saturate(0.75);
+}
+body.ot-mood-mourning {
+  background: #050505 !important;
+}
+.ot-mood-mourning * {
+  --tw-shadow-color: rgb(0 0 0 / 0.5);
+}
