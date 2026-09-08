@@ -34,15 +34,35 @@ export default function MafiaModal() {
   const cityName =
     CITIES.find((c) => c.id === homeCityId)?.name || "İstanbul";
 
+  const assignActiveBoss = (nextBoss: MafiaBoss | null, due = true) => {
+    useGameStore.setState({
+      activeBoss: nextBoss as any,
+      mafiaDebtDue: due,
+    });
+  };
+
+  const clearActiveBoss = () => {
+    useGameStore.setState({
+      activeBoss: null as any,
+      mafiaDebtDue: false,
+    });
+  };
+
   // Store’dan aidat geldiyse modal aç
   useEffect(() => {
     if (mafiaDebtDue && activeBoss && phase === "closed") {
+      const selectedBoss = activeBoss as any;
+
       setBoss({
-        ...activeBoss,
-        kind: activeBoss.tier,
-        cost: activeBoss.weeklyFee,
-        messageTemplate: activeBoss.message,
-      });
+        ...selectedBoss,
+        kind: selectedBoss.type ?? selectedBoss.kind ?? "sahte",
+        cost: selectedBoss.weeklyFee ?? selectedBoss.cost ?? 0,
+        messageTemplate: selectedBoss.message ?? "",
+        payLine: selectedBoss.payLine ?? "",
+        refuseLine: selectedBoss.refuseLine ?? "",
+        type: selectedBoss.type ?? selectedBoss.kind ?? "sahte",
+      } as MafiaBoss);
+
       setKnown(false);
       setPhase("knock");
     }
@@ -81,29 +101,29 @@ export default function MafiaModal() {
   const pay = () => {
     // Store’a boss yazılı değilse yaz
     if (!activeBoss) {
-      useGameStore.setState({
-        activeBoss: boss,
-        mafiaDebtDue: true,
-      });
+      assignActiveBoss(boss);
     }
-    const ok = payMafia();
-    setResult(
-      ok
-        ? `${boss.bossName}: “${boss.payLine}”`
-        : `Kasa yetmedi (${boss.cost} ₺). Bakiye: ${balance} ₺`
-    );
+
+    if (balance < boss.cost) {
+      setResult(`Kasa yetmedi (${boss.cost} ₺). Bakiye: ${balance} ₺`);
+      setPhase("result");
+      return;
+    }
+
+    payMafia();
+    setResult(`${boss.bossName}: “${boss.payLine}”`);
     setPhase("result");
   };
 
   const raconHard = () => {
     if (boss.kind === "sahte") {
-      useGameStore.setState({ mafiaDebtDue: false, activeBoss: null });
+      clearActiveBoss();
       setResult(
         `${RACON_DELIKANLI}\n\n${boss.bossName}: “T-tamam ağa… yanlış anlama… biz de şaka… gideriz.”\n\nBedava kurtuldun.`
       );
     } else {
       if (!activeBoss) {
-        useGameStore.setState({ activeBoss: boss, mafiaDebtDue: true });
+        assignActiveBoss(boss);
       }
       refuseMafia();
       setResult(
@@ -121,7 +141,7 @@ export default function MafiaModal() {
       return;
     }
     addLedger("Çorba parası", -fee);
-    useGameStore.setState({ mafiaDebtDue: false, activeBoss: null });
+    clearActiveBoss();
     setResult(
       `${RACON_ESNAF}\n\n${boss.bossName}: “Anlaştık kaptan. ${fee} ₺ ile defter kapandı. Yolun açık.”`
     );
@@ -134,14 +154,14 @@ export default function MafiaModal() {
     ]!.replace(/\{name\}/g, playerName || "Ağa");
     if (boss.kind === "hakiki") {
       if (!activeBoss) {
-        useGameStore.setState({ activeBoss: boss, mafiaDebtDue: true });
+        assignActiveBoss(boss);
       }
       refuseMafia();
       setResult(
         `${boss.bossName}: “${line}”\n\nKapıyı kapattın. ${boss.refuseLine}`
       );
     } else {
-      useGameStore.setState({ mafiaDebtDue: false, activeBoss: null });
+      clearActiveBoss();
       setResult(
         `${boss.bossName}: “${line}”\n\nBlöf. Bir süre taciz mesajı gelebilir.`
       );
