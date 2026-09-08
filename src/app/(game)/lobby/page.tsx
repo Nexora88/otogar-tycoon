@@ -9,6 +9,7 @@ import {
   sendLeader,
   sendLot,
   sendAuctionBid,
+  sendSabotage,
   type ChatMsg,
   type PricePulse,
   type LeaderPing,
@@ -25,7 +26,7 @@ export default function LobbyPage() {
   const playerName = useGameStore((s) => s.playerName);
   const balance = useGameStore((s) => s.balance);
   const reputation = useGameStore((s) => s.reputation);
-  const homeCity = useGameStore((s) => s.homeCity);
+  const terminalName = useGameStore((s) => s.terminalName);
   const createRoom = useGameStore((s) => s.createRoom);
   const joinRoomStore = useGameStore((s) => s.joinRoom);
   const leaveRoomStore = useGameStore((s) => s.leaveRoom);
@@ -33,7 +34,6 @@ export default function LobbyPage() {
   const roomCode = useGameStore((s) => s.roomCode);
   const roomName = useGameStore((s) => s.roomName);
   const spendMoney = useGameStore((s) => s.spendMoney);
-  const addMoney = useGameStore((s) => s.addMoney);
   const addLedger = useGameStore((s) => s.addLedger);
 
   const [ligaName, setLigaName] = useState("Trakya Ligi");
@@ -47,26 +47,45 @@ export default function LobbyPage() {
   const [text, setText] = useState("");
   const [bid, setBid] = useState("");
   const [connected, setConnected] = useState(false);
+  const [boardTab, setBoardTab] = useState<"money" | "score">("money");
+  const [targets, setTargets] = useState<string[]>([]);
+  const [saboLog, setSaboLog] = useState<string[]>([]);
 
   const display = playerName || companyName || "Esnaf";
   const firm = companyName || "İsimsiz Tur";
+  const cityHint =
+    (terminalName && terminalName.split(/\s+/)[0]) ||
+    firm.split(/\s+/)[0] ||
+    "Keşan";
   const score = balance + reputation * 500;
-  const title = lobbyTitle(score, homeCity || "Keşan");
+  const title = lobbyTitle(score, cityHint);
 
-  const ranked = useMemo(() => {
-    const list = Object.values(board);
-    // kendini ekle
-    const self: LeaderPing = {
+  const selfPing: LeaderPing = useMemo(
+    () => ({
       name: display,
       company: firm,
       score,
       rep: reputation,
       title,
       at: Date.now(),
-    };
-    const map = { ...board, [display]: self };
+    }),
+    [display, firm, score, reputation, title]
+  );
+
+  const rankedScore = useMemo(() => {
+    const map = { ...board, [display]: { ...selfPing, score } };
     return Object.values(map).sort((a, b) => b.score - a.score);
-  }, [board, display, firm, score, reputation, title]);
+  }, [board, display, selfPing, score]);
+
+  const rankedMoney = useMemo(() => {
+    const map = { ...board, [display]: selfPing };
+    return Object.values(map)
+      .map((r) => ({
+        ...r,
+        money: Math.max(0, r.score - r.rep * 500),
+      }))
+      .sort((a, b) => b.money - a.money);
+  }, [board, display, selfPing]);
 
   const publishSelf = useCallback(() => {
     void sendLeader({
@@ -110,19 +129,35 @@ export default function LobbyPage() {
         onChat: (m) => setChat((c) => [...c, m].slice(-50)),
         onPrice: (p) => setPrices((x) => [p, ...x].slice(0, 15)),
         onPresence: (n) => setPresence(n),
-        onLeader: (l) =>
-          setBoard((b) => ({ ...b, [l.name]: l })),
+        onLeader: (l) => {
+          setBoard((b) => ({ ...b, [l.name]: l }));
+          setTargets((t) =>
+            Array.from(new Set([...t, l.company].filter(Boolean))).slice(0, 12)
+          );
+        },
         onLot: (l) => setLot(l),
         onAuction: (a) => {
           setLot((prev) =>
-            prev && prev.id
-              ? {
-                  ...prev,
-                  highBid: a.amount,
-                  highBidder: a.bidder,
-                }
+            prev
+              ? { ...prev, highBid: a.amount, highBidder: a.bidder }
               : prev
           );
+        },
+        onSabotage: (s) => {
+          setSaboLog((x) =>
+            [`${s.from} → ${s.target}: ${s.kind}`, ...x].slice(0, 8)
+          );
+          if (s.target === display || s.target === firm) {
+            const penalty = s.kind === "ariza" ? 1500 : 800;
+            useGameStore.setState((st) => ({
+              balance: Math.max(0, st.balance - penalty),
+              reputation: Math.max(
+                0,
+                st.reputation - (s.kind === "ariza" ? 2 : 0)
+              ),
+            }));
+            useGameStore.getState().addLedger("Rakip darbesi", -penalty);
+          }
         },
       });
       if (cancelled) return;
@@ -134,7 +169,7 @@ export default function LobbyPage() {
         setConnected(false);
         setStatus(
           res.reason === "supabase_off"
-            ? "Yerel oda — sıralama bu cihazda"
+            ? "Yerel oda"
             : `Bağlantı: ${res.reason}`
         );
       }
@@ -144,20 +179,18 @@ export default function LobbyPage() {
       cancelled = true;
       leaveRoomChannel();
     };
-  }, [roomCode, display, roomName, publishSelf]);
+  }, [roomCode, display, firm, roomName, publishSelf]);
 
-  // Periyodik skor yayını
   useEffect(() => {
     if (!roomCode) return;
-    const id = setInterval(() => publishSelf(), 20000);
+    const id = setInterval(() => publishSelf(), 18000);
     return () => clearInterval(id);
   }, [roomCode, publishSelf]);
 
-  // Ara sıra peron ilanı (oda sahibi hissi — herkes açabilir)
   useEffect(() => {
     if (!roomCode || !connected) return;
     const id = setInterval(() => {
-      if (Math.random() > 0.35) return;
+      if (Math.random() > 0.4) return;
       const t = rollLot();
       const lotPayload: PeronLot = {
         id: `lot-${Date.now()}`,
@@ -171,27 +204,14 @@ export default function LobbyPage() {
       };
       setLot(lotPayload);
       void sendLot(lotPayload);
-      setChat((c) => [
-        ...c,
-        {
-          id: `sys-${Date.now()}`,
-          from: "Peron İdaresi",
-          text: `${t.from} → ${t.to} · ${t.capacity} kapasite açık artırmada! Min ${t.minBid} ₺`,
-          at: Date.now(),
-        },
-      ]);
-    }, 55_000);
+    }, 60_000);
     return () => clearInterval(id);
   }, [roomCode, connected]);
 
-  const create = () => {
-    createRoom(ligaName);
-  };
-
+  const create = () => createRoom(ligaName);
   const join = () => {
-    if (!joinRoomStore(joinCode)) alert("Geçersiz kod (en az 4)");
+    if (!joinRoomStore(joinCode)) alert("Geçersiz kod");
   };
-
   const leave = () => {
     leaveRoomChannel();
     leaveRoomStore();
@@ -201,16 +221,18 @@ export default function LobbyPage() {
     setBoard({});
     setLot(null);
     setPresence(0);
+    setTargets([]);
   };
 
   const shareX = () => {
-    const top = ranked[0];
-    const extra = top
-      ? ` Şu an lider: ${top.title} (${top.company}).`
-      : "";
-    const base = shareRoomText();
-    const t = encodeURIComponent(base + extra + " #OtogarTycoon");
-    window.open(`https://x.com/intent/tweet?text=${t}`, "_blank");
+    const rich = rankedMoney[0];
+    const extra = rich ? ` Zirve kasa: ${rich.company}.` : "";
+    window.open(
+      `https://x.com/intent/tweet?text=${encodeURIComponent(
+        shareRoomText() + extra + " #OtogarTycoon"
+      )}`,
+      "_blank"
+    );
   };
 
   const send = async () => {
@@ -243,31 +265,9 @@ export default function LobbyPage() {
       alert("Kasa yetmiyor");
       return;
     }
-    // Eskort: teklif blokesi (basit)
-    if (!spendMoney(amount - (lot.highBidder === display ? lot.highBid : 0))) {
-      // basitleştir: sadece fark
-    }
-    // Daha net: yeni teklif tam tutarı rezerve etmeyelim — sadece kazanınca kes
-    await sendAuctionBid(
-      `${lot.from}-${lot.to}`,
-      display,
-      amount
-    );
-    setLot({
-      ...lot,
-      highBid: amount,
-      highBidder: display,
-    });
+    await sendAuctionBid(`${lot.from}-${lot.to}`, display, amount);
+    setLot({ ...lot, highBid: amount, highBidder: display });
     setBid("");
-    setChat((c) => [
-      ...c,
-      {
-        id: `bid-${Date.now()}`,
-        from: "Müzayede",
-        text: `${display} ${amount} ₺ teklif etti (${lot.from}→${lot.to})`,
-        at: Date.now(),
-      },
-    ]);
   };
 
   const claimLot = () => {
@@ -280,17 +280,7 @@ export default function LobbyPage() {
       alert("Ödeme başarısız");
       return;
     }
-    addLedger(`Peron hakkı ${lot.from}-${lot.to}`, -lot.highBid);
-    addMoney(0);
-    setChat((c) => [
-      ...c,
-      {
-        id: `win-${Date.now()}`,
-        from: "Peron İdaresi",
-        text: `${display} ${lot.from}→${lot.to} peronunu ${lot.highBid} ₺ ile aldı!`,
-        at: Date.now(),
-      },
-    ]);
+    addLedger(`Peron ${lot.from}-${lot.to}`, -lot.highBid);
     setLot(null);
     publishSelf();
   };
@@ -316,7 +306,7 @@ export default function LobbyPage() {
       <div>
         <h1 className="text-2xl font-bold">Lobi · Peron Savaşı</h1>
         <p className="text-xs text-zinc-500 mt-1">
-          {title} · skor {score.toLocaleString("tr-TR")}
+          {title} · kasa {formatMoney(balance)}
           {isSupabaseConfigured() ? " · canlı" : " · yerel"}
         </p>
         {status && (
@@ -327,7 +317,7 @@ export default function LobbyPage() {
       {!roomCode ? (
         <div className="space-y-4">
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-            <div className="text-sm font-semibold mb-3">Lig / oda kur</div>
+            <div className="text-sm font-semibold mb-3">Lig kur</div>
             <input
               className="w-full mb-3 px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-700 text-sm"
               value={ligaName}
@@ -362,7 +352,6 @@ export default function LobbyPage() {
         </div>
       ) : (
         <>
-          {/* Oda kartı */}
           <div className="bg-zinc-900 border border-cyan-800/60 rounded-2xl p-5">
             <div className="text-xs text-zinc-500">Aktif lig</div>
             <div className="text-lg font-bold text-cyan-300">
@@ -372,7 +361,7 @@ export default function LobbyPage() {
               {roomCode}
             </div>
             <div className="text-xs text-emerald-400 mt-2">
-              {presence} esnaf · sen: {title}
+              {presence} esnaf · {title}
             </div>
             <button
               type="button"
@@ -390,43 +379,65 @@ export default function LobbyPage() {
             </button>
           </div>
 
-          {/* Sıralama */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
-            <div className="text-[10px] tracking-widest text-amber-600 font-bold mb-2">
-              LİG SIRALAMASI · BAŞ AĞA ADAYLARI
+            <div className="flex gap-2 mb-3">
+              <button
+                type="button"
+                onClick={() => setBoardTab("money")}
+                className={`flex-1 text-[10px] py-1.5 rounded-lg font-bold ${
+                  boardTab === "money"
+                    ? "bg-emerald-600 text-black"
+                    : "bg-zinc-800 text-zinc-400"
+                }`}
+              >
+                EN ZENGİN KASA
+              </button>
+              <button
+                type="button"
+                onClick={() => setBoardTab("score")}
+                className={`flex-1 text-[10px] py-1.5 rounded-lg font-bold ${
+                  boardTab === "score"
+                    ? "bg-amber-600 text-black"
+                    : "bg-zinc-800 text-zinc-400"
+                }`}
+              >
+                LİG SKORU
+              </button>
             </div>
             <ul className="space-y-2">
-              {ranked.slice(0, 8).map((r, i) => (
-                <li
-                  key={r.name + i}
-                  className="flex items-center gap-2 text-xs border-b border-zinc-800/80 pb-2"
-                >
-                  <span className="w-5 text-zinc-500 font-mono">{i + 1}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-zinc-200 truncate">
-                      {r.company}
-                    </div>
-                    <div className="text-[10px] text-amber-500/90 truncate">
-                      {r.title} · {r.name}
-                    </div>
-                  </div>
-                  <div className="text-right font-mono text-emerald-400/90">
-                    {r.score.toLocaleString("tr-TR")}
-                  </div>
-                </li>
-              ))}
+              {(boardTab === "money" ? rankedMoney : rankedScore)
+                .slice(0, 8)
+                .map((r, i) => {
+                  const money = Math.max(0, r.score - r.rep * 500);
+                  return (
+                    <li
+                      key={r.name + String(i)}
+                      className="flex items-center gap-2 text-xs border-b border-zinc-800/80 pb-2"
+                    >
+                      <span className="w-5 text-zinc-500 font-mono">
+                        {i + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold truncate">{r.company}</div>
+                        <div className="text-[10px] text-amber-500/90 truncate">
+                          {r.title}
+                        </div>
+                      </div>
+                      <div className="text-right font-mono text-emerald-400/90">
+                        {boardTab === "money"
+                          ? formatMoney(money)
+                          : r.score.toLocaleString("tr-TR")}
+                      </div>
+                    </li>
+                  );
+                })}
             </ul>
-            <p className="text-[10px] text-zinc-600 mt-2">
-              Skor ≈ kasa + itibar×500. 30 oyun günü sonunda zirvedeki Baş Ağa
-              (yakında resmi taç).
-            </p>
           </div>
 
-          {/* Müzayede */}
           <div className="bg-zinc-900 border border-amber-900/40 rounded-2xl p-4">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex justify-between mb-2">
               <div className="text-[10px] tracking-widest text-amber-500 font-bold">
-                PERON AÇIK ARTIRMA
+                PERON MÜZAYEDESİ
               </div>
               <button
                 type="button"
@@ -437,30 +448,21 @@ export default function LobbyPage() {
               </button>
             </div>
             {!lot ? (
-              <p className="text-xs text-zinc-600">
-                Bekleniyor… veya “İlan aç”. Örn: Edirne → Keşan Yaylaköy.
-              </p>
+              <p className="text-xs text-zinc-600">İlan yok</p>
             ) : (
               <div className="space-y-2">
                 <div className="text-sm font-semibold">
                   {lot.from} → {lot.to}
                 </div>
                 <div className="text-xs text-zinc-400">
-                  Kapasite {lot.capacity} · min {formatMoney(lot.minBid)}
-                </div>
-                <div className="text-sm text-amber-300">
-                  Teklif: {formatMoney(lot.highBid)}
+                  Kapasite {lot.capacity} · {formatMoney(lot.highBid)}
                   {lot.highBidder ? ` · ${lot.highBidder}` : ""}
-                </div>
-                <div className="text-[10px] text-zinc-500">
-                  Bitiş ~{Math.max(0, Math.ceil((lot.endsAt - Date.now()) / 1000))}s
                 </div>
                 <div className="flex gap-2">
                   <input
                     className="flex-1 bg-zinc-950 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm"
                     value={bid}
                     onChange={(e) => setBid(e.target.value)}
-                    placeholder={`+500 min`}
                     inputMode="numeric"
                   />
                   <button
@@ -477,24 +479,55 @@ export default function LobbyPage() {
                     onClick={claimLot}
                     className="w-full py-2 rounded-lg bg-emerald-600 text-black text-sm font-bold"
                   >
-                    Peronu al · {formatMoney(lot.highBid)}
+                    Peronu al
                   </button>
                 )}
               </div>
             )}
           </div>
 
-          {/* Fiyat nabzı */}
+          <div className="bg-zinc-900 border border-red-900/30 rounded-2xl p-4">
+            <div className="text-[10px] tracking-widest text-red-400 font-bold mb-1">
+              ESNAF DARBESİ · 2500₺
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {targets
+                .filter((t) => t !== firm)
+                .map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    className="text-[10px] px-2 py-1 rounded border border-zinc-700"
+                    onClick={() => {
+                      if (!spendMoney(2500)) {
+                        alert("Para yetmiyor");
+                        return;
+                      }
+                      addLedger(`Darb · ${t}`, -2500);
+                      void sendSabotage(display, t, "ariza");
+                    }}
+                  >
+                    {t}
+                  </button>
+                ))}
+            </div>
+            {saboLog.map((l, i) => (
+              <div key={i} className="text-[10px] text-red-300/80 mt-1">
+                {l}
+              </div>
+            ))}
+          </div>
+
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
             <div className="text-[10px] tracking-widest text-zinc-500 font-bold mb-2">
               FİYAT NABZI
             </div>
             {prices.length === 0 ? (
-              <p className="text-xs text-zinc-600">Sefer açılınca dolacak.</p>
+              <p className="text-xs text-zinc-600">Sefer açılınca…</p>
             ) : (
               <ul className="space-y-1 text-xs max-h-28 overflow-y-auto">
                 {prices.map((p, i) => (
-                  <li key={i} className="text-amber-200/90">
+                  <li key={i}>
                     {p.company}: {p.route} · {p.price} ₺
                   </li>
                 ))}
@@ -502,16 +535,15 @@ export default function LobbyPage() {
             )}
           </div>
 
-          {/* Sohbet */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
             <div className="text-[10px] tracking-widest text-zinc-500 font-bold mb-2">
-              SOHBET · rütbeli isim
+              SOHBET
             </div>
-            <div className="h-44 overflow-y-auto space-y-1.5 text-xs mb-2">
+            <div className="h-40 overflow-y-auto space-y-1 text-xs mb-2">
               {chat.map((m) => (
                 <div key={m.id}>
-                  <span className="text-cyan-400 font-medium">{m.from}</span>
-                  <span className="text-zinc-500"> · </span>
+                  <span className="text-cyan-400">{m.from}</span>
+                  {" · "}
                   <span className="text-zinc-300">{m.text}</span>
                 </div>
               ))}
@@ -522,7 +554,6 @@ export default function LobbyPage() {
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && void send()}
-                placeholder="Keşan Tur Ağası yazıyor…"
               />
               <button
                 type="button"
@@ -537,4 +568,4 @@ export default function LobbyPage() {
       )}
     </div>
   );
-          }
+}
