@@ -11,23 +11,27 @@ import NewspaperModal from "@/components/NewspaperModal";
 import MafiaModal from "@/components/MafiaModal";
 import MeetingModal from "@/components/MeetingModal";
 import TicketReceipt from "@/components/TicketReceipt";
-import ComplaintModal from "@/components/ComplaintModal";
-import { CalendarMood } from "@/components/CalendarMood";
+import InspectorModal from "@/components/InspectorModal";
 
-const NAV: { href: string; label: string; icon: string; needBoss?: boolean }[] =
-  [
-    { href: "/dashboard", label: "Panel", icon: "▣" },
-    { href: "/shift", label: "Vardiya", icon: "◎" },
-    { href: "/map", label: "Harita", icon: "◈", needBoss: true },
-    { href: "/expeditions", label: "Sefer", icon: "▸", needBoss: true },
-    { href: "/garage", label: "Garaj", icon: "▣", needBoss: true },
-    { href: "/office", label: "Ofis", icon: "▤", needBoss: true },
-    { href: "/terminal", label: "Terminal", icon: "▦", needBoss: true },
-    { href: "/market", label: "Pazar", icon: "◇", needBoss: true },
-    { href: "/lobby", label: "Lobi", icon: "◎" },
-    { href: "/staff", label: "Kadro", icon: "☺", needBoss: true },
-    { href: "/auction", label: "Borsa", icon: "⚡", needBoss: true },
-  ];
+const NAV: {
+  href: string;
+  label: string;
+  icon: string;
+  needBoss?: boolean;
+}[] = [
+  { href: "/dashboard", label: "Panel", icon: "▣" },
+  { href: "/shift", label: "Vardiya", icon: "◎" },
+  { href: "/events", label: "Etkinlik", icon: "★" },
+  { href: "/map", label: "Harita", icon: "◈", needBoss: true },
+  { href: "/expeditions", label: "Sefer", icon: "▸", needBoss: true },
+  { href: "/garage", label: "Garaj", icon: "▣", needBoss: true },
+  { href: "/office", label: "Ofis", icon: "▤", needBoss: true },
+  { href: "/terminal", label: "Terminal", icon: "▦", needBoss: true },
+  { href: "/market", label: "Pazar", icon: "◇", needBoss: true },
+  { href: "/lobby", label: "Lobi", icon: "◎" },
+  { href: "/staff", label: "Kadro", icon: "☺", needBoss: true },
+  { href: "/auction", label: "Borsa", icon: "⚡", needBoss: true },
+];
 
 export default function GameLayout({
   children,
@@ -45,7 +49,6 @@ export default function GameLayout({
   const gameYear = useGameStore((s) => s.gameYear);
   const paperNotify = useGameStore((s) => s.paperNotify);
   const openPaperEdition = useGameStore((s) => s.openPaperEdition);
-  const clearPaperNotify = useGameStore((s) => s.clearPaperNotify);
   const tickGameTime = useGameStore((s) => s.tickGameTime);
   const forceRegister = useGameStore((s) => s.forceRegister);
   const isGuest = useGameStore((s) => s.isGuest);
@@ -56,6 +59,7 @@ export default function GameLayout({
   const calendarMood = useGameStore((s) => s.calendarMood);
   const calendarTitle = useGameStore((s) => s.calendarTitle);
   const fuelPrice = useGameStore((s) => s.fuelPrice);
+  const inspector = useGameStore((s) => s.inspector);
 
   const careerStarted = useCareerStore((s) => s.careerStarted);
   const careerDone = useCareerStore((s) => s.careerDone);
@@ -64,19 +68,11 @@ export default function GameLayout({
 
   const isBoss = careerDone || setupDone || rank === "bagimsiz";
 
-  // Saat / gün nabzı
   useEffect(() => {
     tickGameTime();
     const id = setInterval(() => tickGameTime(), 15000);
     return () => clearInterval(id);
   }, [tickGameTime]);
-
-  // Misafir süresi
-  useEffect(() => {
-    if (forceRegister && isGuest) {
-      // soft uyarı — hard redirect istersen /register
-    }
-  }, [forceRegister, isGuest]);
 
   const mourning = calendarMood === "mourning";
   const national = calendarMood === "national";
@@ -87,9 +83,6 @@ export default function GameLayout({
         mourning ? "bg-black" : national ? "bg-[#0c0a06]" : "bg-zinc-950"
       }`}
     >
-      <CalendarMood />
-
-      {/* Üst şerit */}
       <header
         className={`sticky top-0 z-30 border-b backdrop-blur-md ${
           mourning
@@ -112,28 +105,36 @@ export default function GameLayout({
             </div>
           </div>
 
-          <div className="flex items-center gap-3 text-xs">
+          <div className="flex items-center gap-2 sm:gap-3 text-xs flex-wrap justify-end">
             <div className="text-right">
               <div className="font-mono text-emerald-400 text-sm">
                 {formatMoney(balance)}
               </div>
               <div className="text-zinc-500">itibar {reputation}</div>
             </div>
+
             {(bankDebt > 0 || taxDue > 0) && (
               <button
                 type="button"
                 onClick={() => router.push("/office")}
                 className="text-[10px] px-2 py-1 rounded border border-red-900/60 text-red-300"
               >
-                Borç {bankDebt > 0 ? formatMoney(bankDebt) : ""}
-                {taxDue > 0 ? ` · vergi` : ""}
+                {bankDebt > 0 ? `Borç ${formatMoney(bankDebt)}` : "Vergi"}
               </button>
             )}
+
             {mafiaDebtDue && (
               <span className="text-[10px] px-2 py-1 rounded bg-red-950 text-red-300 border border-red-800 animate-pulse">
                 Kapı
               </span>
             )}
+
+            {inspector && (
+              <span className="text-[10px] px-2 py-1 rounded bg-amber-950 text-amber-200 border border-amber-800">
+                Müfettiş
+              </span>
+            )}
+
             {paperNotify && (
               <button
                 type="button"
@@ -144,6 +145,7 @@ export default function GameLayout({
                 {paperNotify === "evening" ? " (akşam)" : " (sabah)"}
               </button>
             )}
+
             {forceRegister && isGuest && (
               <Link
                 href="/register"
@@ -155,12 +157,9 @@ export default function GameLayout({
           </div>
         </div>
 
-        {/* Nav */}
         <nav className="max-w-6xl mx-auto px-2 pb-2 flex gap-1 overflow-x-auto text-[11px]">
           {NAV.map((item) => {
-            if (item.needBoss && !isBoss && careerStarted) {
-              return null;
-            }
+            if (item.needBoss && !isBoss && careerStarted) return null;
             const active = pathname?.startsWith(item.href);
             return (
               <Link
@@ -180,7 +179,6 @@ export default function GameLayout({
         </nav>
       </header>
 
-      {/* Yas / bayram şeridi */}
       {(mourning || national) && (
         <div
           className={`text-center text-[11px] py-1.5 font-semibold tracking-wide ${
@@ -195,32 +193,27 @@ export default function GameLayout({
         </div>
       )}
 
-      <main className="flex-1 max-w-6xl w-full mx-auto">{children}</main>
+      <main className="flex-1 max-w-6xl w-full mx-auto px-0">{children}</main>
 
-      {/* Alt mobilde hızlı link */}
       <footer className="md:hidden sticky bottom-0 z-20 border-t border-zinc-800 bg-zinc-950/95 px-2 py-1.5 flex justify-around text-[10px] text-zinc-500">
         <Link href="/shift">Vardiya</Link>
         <Link href="/dashboard">Panel</Link>
+        <Link href="/events">Etkinlik</Link>
         <Link href="/lobby">Lobi</Link>
-        <Link href="/office">Ofis</Link>
         <button
           type="button"
-          onClick={() => {
-            if (paperNotify) openPaperEdition(paperNotify);
-            else openPaperEdition("morning");
-          }}
+          onClick={() => openPaperEdition(paperNotify || "morning")}
         >
           Gazete
         </button>
       </footer>
 
-      {/* Modallar / ambient UI */}
       <PhoneUI />
       <NewspaperModal />
       <MafiaModal />
       <MeetingModal />
       <TicketReceipt />
-      <ComplaintModal />
+      <InspectorModal />
     </div>
   );
 }
