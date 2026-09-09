@@ -33,20 +33,27 @@ export default function LandingPage() {
   const onSplashDone = useCallback(() => setShowSplash(false), []);
 
   return (
-    <div className="min-h-screen bg-[#0a0908] text-stone-100 antialiased">
+    <div className="min-h-screen bg-[#0a0908] text-stone-100 antialiased overflow-x-hidden">
       {showSplash && <SplashScreen onDone={onSplashDone} />}
 
       <div className="pointer-events-none fixed inset-0 z-0">
         <div className="absolute inset-0 bg-gradient-to-b from-[#2a1208] via-[#0f0d0b] to-[#070605]" />
         <div className="absolute inset-0 opacity-40 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,#f59e0b33,transparent)]" />
-        <div className="absolute inset-0 opacity-25 bg-[radial-gradient(circle_at_85%_15%,#22d3ee28,transparent_42%)]" />
-        <div className="absolute inset-0 opacity-[0.04] bg-[repeating-linear-gradient(0deg,transparent,transparent_3px,#000_3px,#000_4px)]" />
+        <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_90%_20%,#22d3ee22,transparent_40%)]" />
+      </div>
+
+      {/* Sağda dev otobüs silüeti */}
+      <div
+        className="pointer-events-none fixed right-[-8%] bottom-[8%] z-0 opacity-[0.12] hidden sm:block"
+        aria-hidden
+      >
+        <BusSilhouette className="w-[min(52vw,520px)] h-auto text-amber-200" />
       </div>
 
       <div className="relative z-10">
         <header className="max-w-6xl mx-auto px-4 sm:px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-amber-400 to-orange-600 shadow-lg shadow-orange-900/50" />
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-amber-400 to-orange-600 shadow-lg shadow-orange-900/40" />
             <div>
               <div className="text-[10px] tracking-[0.35em] text-amber-500 font-semibold">
                 NEXORA
@@ -81,11 +88,11 @@ export default function LandingPage() {
           </nav>
         </header>
 
-        <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-14 sm:pt-22 pb-16 sm:pb-24">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[11px] text-amber-100/90 mb-6">
+        <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-10 sm:pt-16 pb-12">
+          <div className="max-w-2xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[11px] text-amber-100/90 mb-5">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Peron Savaşları · Erken erişim
+              Otobüs firması simülasyonu · 1987
             </div>
 
             <h1 className="text-5xl sm:text-7xl font-black tracking-tight leading-[0.92]">
@@ -97,16 +104,34 @@ export default function LandingPage() {
               </span>
             </h1>
 
-            <p className="mt-6 text-lg sm:text-xl text-stone-400 leading-relaxed max-w-xl">
-              1987 Türkiye’si. Yazıhane, emektar otobüs, peron kapışması.
-              Çıraklıktan terminal ağalığına —{" "}
-              <span className="text-stone-200">gerçek para yok</span>, racon var.
+            <p className="mt-5 text-base sm:text-lg text-stone-400 leading-relaxed">
+              Esenler’den AŞTİ’ye, Keşan’dan İzmir’e.{" "}
+              <span className="text-amber-200/90">Bilet, ikram, şoför, peron</span>
+              — bir otobüs şirketi kur, fiyat savaşında ayakta kal.{" "}
+              <span className="text-stone-200">Gerçek para yok</span>, racon var.
             </p>
 
-            <div className="mt-10 flex flex-col sm:flex-row gap-3">
+            {/* Mini hat şeridi — oyun dilini anlatır */}
+            <div className="mt-6 flex flex-wrap gap-2 text-[11px]">
+              {[
+                "İstanbul → Ankara",
+                "Keşan → Edirne",
+                "O302 emektar",
+                "Hakiki Peron gazetesi",
+              ].map((t) => (
+                <span
+                  key={t}
+                  className="px-2.5 py-1 rounded-lg border border-amber-900/40 bg-amber-950/30 text-amber-200/70"
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
+
+            <div className="mt-9 flex flex-col sm:flex-row gap-3">
               <Link
                 href="/play"
-                className="group inline-flex items-center justify-center px-8 py-4 rounded-2xl font-bold text-stone-950 bg-gradient-to-r from-amber-300 via-orange-400 to-orange-500 shadow-[0_0_48px_-8px_rgba(249,115,22,0.55)] hover:brightness-105 transition"
+                className="group inline-flex items-center justify-center px-8 py-4 rounded-2xl font-bold text-stone-950 bg-gradient-to-r from-amber-300 via-orange-400 to-orange-500 shadow-[0_0_40px_-8px_rgba(249,115,22,0.5)] hover:brightness-105 transition"
               >
                 Hemen oyna
                 <span className="ml-2 opacity-70 group-hover:translate-x-0.5 transition">
@@ -115,64 +140,50 @@ export default function LandingPage() {
               </Link>
               <Link
                 href="/how-to-play"
-                className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold border border-stone-600 text-stone-200 hover:border-cyan-500/40 hover:bg-cyan-950/25 transition"
+                className="inline-flex items-center justify-center px-8 py-4 rounded-2xl font-semibold border border-stone-600 text-stone-200 hover:border-cyan-500/40 transition"
               >
                 Nasıl oynanır
               </Link>
             </div>
 
-            <div className="mt-12 flex flex-wrap gap-8 sm:gap-12">
+            <div className="mt-10 flex flex-wrap gap-8">
               <Stat label="Açık oda" value={`~${live.rooms}`} />
               <Stat label="Sefer nabzı" value={`~${live.trips}`} />
               <Stat label="Peron" value={`~${live.online}`} />
             </div>
           </div>
-        </section>
 
-        <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-20 grid md:grid-cols-3 gap-4">
-          <Card
-            n="01"
-            title="Yönet"
-            body="Sefer, ikram, kadro, borç. Ofisten ağa gibi yönet."
-            c="text-amber-500/80 border-amber-500/20"
-          />
-          <Card
-            n="02"
-            title="Kapış"
-            body="Fiyat savaşı, lobi kodu, açık odada nabız."
-            c="text-cyan-500/80 border-cyan-500/20"
-          />
-          <Card
-            n="03"
-            title="Hisset"
-            body="Gazete, kapı, 1987 yazıhanesi. Yurtta sulh."
-            c="text-rose-500/80 border-rose-500/20"
-          />
-        </section>
-
-        <section className="border-y border-white/5 bg-white/[0.02]">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 flex flex-col md:flex-row md:items-center justify-between gap-8">
-            <div className="max-w-md">
-              <h2 className="text-2xl font-bold">Bir günün hikâyesi</h2>
-              <p className="mt-2 text-sm text-stone-500 leading-relaxed">
-                Sabah baskısı, sefer dolumu, kapı, akşam defter. Gün hızlı akar;
-                kararlar kalır.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {["Çırak", "Sefer", "Kadro", "Terminal", "Lobi"].map((t) => (
-                <span
-                  key={t}
-                  className="px-3 py-1.5 rounded-full text-xs border border-white/10 bg-white/5 text-stone-400"
-                >
-                  {t}
-                </span>
-              ))}
-            </div>
+          {/* Mobil otobüs */}
+          <div className="sm:hidden mt-10 opacity-25 flex justify-center">
+            <BusSilhouette className="w-64 text-amber-200" />
           </div>
         </section>
 
-        <footer className="max-w-6xl mx-auto px-4 sm:px-6 py-12 flex flex-col sm:flex-row justify-between gap-4 text-[12px] text-stone-600">
+        <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-16 grid md:grid-cols-3 gap-4">
+          <Card
+            n="01"
+            title="Sefer kur"
+            body="Hat seç, bilet fiyatı ve ikramı ayarla. Otobüs perondan kalksın."
+            c="border-amber-500/20"
+            nClass="text-amber-500/80"
+          />
+          <Card
+            n="02"
+            title="Yazıhane yönet"
+            body="Şoför, borç, gazete, kapı. Ofisten ağa gibi karar ver."
+            c="border-cyan-500/20"
+            nClass="text-cyan-500/80"
+          />
+          <Card
+            n="03"
+            title="Peron kapış"
+            body="Rakip fiyat kırar. Lobi ve açık odada nabız tut."
+            c="border-rose-500/20"
+            nClass="text-rose-500/80"
+          />
+        </section>
+
+        <footer className="max-w-6xl mx-auto px-4 sm:px-6 py-10 flex flex-col sm:flex-row justify-between gap-4 text-[12px] text-stone-600 border-t border-white/5">
           <div>
             <span className="text-stone-400">Ahmet Eymen Bakraç</span> · Nexora
             Labs
@@ -192,6 +203,39 @@ export default function LandingPage() {
   );
 }
 
+function BusSilhouette({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 400 140"
+      fill="currentColor"
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {/* Gövde */}
+      <path d="M20 90 V45 c0-8 6-14 14-14 h280 c20 0 40 12 48 28 l20 36 v10 H20 z" />
+      {/* Ön */}
+      <path d="M362 95 h18 c6 0 10 4 10 10 v5 h-40 v-8 c0-4 3-7 7-7 z" opacity="0.9" />
+      {/* Camlar */}
+      <rect x="40" y="42" width="36" height="22" rx="3" className="fill-black/40" />
+      <rect x="84" y="42" width="36" height="22" rx="3" className="fill-black/40" />
+      <rect x="128" y="42" width="36" height="22" rx="3" className="fill-black/40" />
+      <rect x="172" y="42" width="36" height="22" rx="3" className="fill-black/40" />
+      <rect x="216" y="42" width="36" height="22" rx="3" className="fill-black/40" />
+      <rect x="260" y="42" width="36" height="22" rx="3" className="fill-black/40" />
+      <rect x="310" y="42" width="42" height="26" rx="4" className="fill-black/35" />
+      {/* Far */}
+      <circle cx="365" cy="78" r="6" className="fill-amber-300/80" />
+      {/* Teker */}
+      <circle cx="70" cy="105" r="18" />
+      <circle cx="70" cy="105" r="8" className="fill-black/50" />
+      <circle cx="300" cy="105" r="18" />
+      <circle cx="300" cy="105" r="8" className="fill-black/50" />
+      {/* Şerit çizgi */}
+      <rect x="30" y="72" width="300" height="4" opacity="0.35" />
+    </svg>
+  );
+}
+
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
@@ -208,17 +252,19 @@ function Card({
   title,
   body,
   c,
+  nClass,
 }: {
   n: string;
   title: string;
   body: string;
   c: string;
+  nClass: string;
 }) {
   return (
     <div
       className={`rounded-2xl border bg-gradient-to-b from-white/[0.04] to-transparent p-6 ${c}`}
     >
-      <div className="text-xs font-mono opacity-90">{n}</div>
+      <div className={`text-xs font-mono ${nClass}`}>{n}</div>
       <h3 className="mt-2 text-lg font-bold text-stone-100">{title}</h3>
       <p className="mt-2 text-sm text-stone-500 leading-relaxed">{body}</p>
     </div>
