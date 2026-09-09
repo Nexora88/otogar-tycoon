@@ -1,146 +1,229 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { useGameStore } from "@/store/gameStore";
 
-/** Wikimedia Commons — kamu malı Atatürk portresi */
-const ATATURK_SRC =
-  "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Ataturk.jpg/220px-Ataturk.jpg";
+const ATATURK =
+  "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Ataturk.jpg/440px-Ataturk.jpg";
 
 const ADS = [
   "Nexora Elektronik · 1987 model radyo",
-  "Bakraç Ticaret · Bilgisayarlı sistemler",
-  "Yerli malı · Herkes onu kullanmalı",
-  "Otogar Tycoon · Peron Savaşları",
+  "Bakraç Ticaret · Defter temiz, yol açık",
+  "Yerli malı kullanmalı",
+  "Otogar Tycoon · Gerçek para yok",
 ];
 
 export default function PhoneUI() {
-  const phoneOpen = useGameStore((s) => s.phoneOpen);
-  const setPhoneOpen = useGameStore((s) => s.setPhoneOpen);
+  const open = useGameStore((s) => s.phoneOpen);
+  const setOpen = useGameStore((s) => s.setPhoneOpen);
   const messages = useGameStore((s) => s.phoneMessages);
-  const markPhoneRead = useGameStore((s) => s.markPhoneRead);
+  const markRead = useGameStore((s) => s.markPhoneRead);
+  const companyName = useGameStore((s) => s.companyName);
 
-  const unread = messages.filter((m) => !m.read).length;
-  const ad = ADS[Math.floor(Date.now() / 60000) % ADS.length]!;
+  const [tab, setTab] = useState<"inbox" | "home">("inbox");
+  const [adIx, setAdIx] = useState(0);
 
-  return (
-    <>
-      {/* Yüzen tuş — sabit köşe */}
+  const unread = useMemo(
+    () => messages.filter((m) => !m.read).length,
+    [messages]
+  );
+
+  // Aynı kaynaktan gelen peş peşe tekrarları gizle (spam kırpma)
+  const cleaned = useMemo(() => {
+    const out: typeof messages = [];
+    let lastKey = "";
+    for (const m of messages) {
+      const key = `${m.from}|${m.body.slice(0, 40)}`;
+      if (key === lastKey) continue;
+      // ambient gürültüyü kıs: aynı from’dan 3’ten fazla gösterme listede
+      const fromCount = out.filter((x) => x.from === m.from).length;
+      if (fromCount >= 3 && m.from !== "Ahmet Eymen Bakraç") continue;
+      out.push(m);
+      lastKey = key;
+      if (out.length >= 18) break;
+    }
+    return out;
+  }, [messages]);
+
+  const openPhone = () => {
+    setOpen(true);
+    markRead();
+    setTab("inbox");
+  };
+
+  if (!open) {
+    return (
       <button
         type="button"
-        onClick={() => {
-          setPhoneOpen(true);
-          markPhoneRead();
-        }}
-        className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-40 w-12 h-12 rounded-lg bg-zinc-800 border-2 border-zinc-600 shadow-lg flex flex-col items-center justify-center"
+        onClick={openPhone}
+        className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-40 w-14 h-14 rounded-2xl bg-stone-900 border border-stone-600 shadow-xl flex flex-col items-center justify-center"
         aria-label="Telefon"
       >
-        <span className="text-[9px] text-amber-500/90 font-mono leading-none">
-          TEL
-        </span>
-        <span className="text-[8px] text-zinc-500 font-mono">87</span>
+        <span className="text-[10px] font-mono text-amber-500/90">TEL</span>
+        <span className="text-[9px] text-stone-500">87</span>
         {unread > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[1.1rem] h-4 px-0.5 rounded bg-red-700 text-[9px] flex items-center justify-center font-bold text-white">
+          <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-[10px] font-bold flex items-center justify-center">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
       </button>
+    );
+  }
 
-      {phoneOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-4">
-          {/* Kasa — tuğla grisi, kalın çerçeve */}
-          <div className="w-full max-w-[260px] rounded-sm border-[6px] border-zinc-700 bg-zinc-900 shadow-2xl overflow-hidden">
-            {/* Üst: hoparlör ızgarası */}
-            <div className="bg-zinc-950 px-4 pt-2 pb-1">
-              <div className="mx-auto w-16 h-1 rounded-full bg-zinc-700" />
-            </div>
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/70 p-3 sm:p-6">
+      {/* Cihaz gövdesi */}
+      <div className="w-full max-w-[320px] rounded-[28px] bg-[#1a1612] border-2 border-stone-700 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        {/* Üst anten / marka */}
+        <div className="bg-[#0c0a08] px-4 pt-3 pb-2 text-center">
+          <div className="text-[9px] tracking-[0.25em] text-stone-500">
+            NEXORA · EL TELFONU
+          </div>
+          <div className="text-[10px] text-amber-700/80 font-mono mt-0.5">
+            87.5 MHz · {companyName?.slice(0, 16) || "Ağa"}
+          </div>
+        </div>
 
-            {/* Duvar kâğıdı: Atatürk portresi + yazı */}
-            <div className="relative h-32 bg-gradient-to-b from-stone-800 to-stone-950 border-b border-zinc-700 overflow-hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={ATATURK_SRC}
-                alt="Mustafa Kemal Atatürk"
-                className="absolute inset-0 w-full h-full object-cover object-top opacity-90"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = "none";
-                }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent" />
-              <div className="absolute bottom-2 left-0 right-0 text-center px-2">
-                <div className="text-[10px] tracking-[0.25em] text-amber-100/90 font-serif">
-                  M. KEMAL ATATÜRK
+        {/* Ekran */}
+        <div className="mx-3 rounded-lg border border-stone-700 bg-[#0e0c0a] overflow-hidden flex flex-col min-h-[360px]">
+          {/* Wallpaper / portre şeridi */}
+          <div className="relative h-28 bg-stone-900 border-b border-stone-800">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={ATATURK}
+              alt=""
+              referrerPolicy="no-referrer"
+              className="absolute inset-0 w-full h-full object-cover object-top opacity-90"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0e0c0a] via-transparent to-black/30" />
+            <div className="absolute bottom-2 left-3 right-3 flex justify-between items-end">
+              <div>
+                <div className="text-[9px] text-amber-200/70 tracking-wider">
+                  ARKA PLAN
                 </div>
-                <div className="text-[8px] text-zinc-400 mt-0.5">
-                  Yurtta sulh, cihanda sulh
+                <div className="text-xs font-serif text-amber-50">
+                  M. Kemal Atatürk
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setPhoneOpen(false)}
-                className="absolute top-1.5 right-1.5 w-6 h-6 rounded-sm bg-zinc-900/80 border border-zinc-600 text-zinc-400 text-xs"
-                aria-label="Kapat"
+                onClick={() => {
+                  setAdIx((i) => (i + 1) % ADS.length);
+                }}
+                className="text-[9px] text-stone-400 border border-stone-600 px-1.5 py-0.5 rounded"
               >
-                ×
+                Reklam
               </button>
             </div>
+          </div>
 
-            {/* Reklam şeridi — Nexora */}
-            <div className="bg-amber-950/80 border-y border-amber-900/50 px-2 py-1">
-              <div className="text-[8px] text-amber-200/90 font-mono tracking-wide truncate text-center">
-                ★ {ad}
-              </div>
-            </div>
+          {/* Reklam şeridi */}
+          <div className="px-2 py-1 bg-amber-950/30 border-b border-stone-800 text-[9px] text-amber-200/60 truncate text-center">
+            {ADS[adIx]}
+          </div>
 
-            {/* Mesaj listesi — küçük ekran */}
-            <div className="max-h-52 overflow-y-auto bg-zinc-950 p-2 space-y-1.5 min-h-[120px]">
-              {messages.length === 0 && (
-                <p className="text-[10px] text-zinc-600 p-3 text-center font-mono">
-                  Mesaj yok
-                  <br />
-                  <span className="text-[8px]">1987 · sesli hat yok</span>
+          {/* Sekmeler */}
+          <div className="flex border-b border-stone-800 text-[11px]">
+            <button
+              type="button"
+              onClick={() => setTab("inbox")}
+              className={`flex-1 py-2 ${
+                tab === "inbox"
+                  ? "text-amber-200 border-b border-amber-600"
+                  : "text-stone-500"
+              }`}
+            >
+              Gelen ({cleaned.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("home")}
+              className={`flex-1 py-2 ${
+                tab === "home"
+                  ? "text-amber-200 border-b border-amber-600"
+                  : "text-stone-500"
+              }`}
+            >
+              Ana ekran
+            </button>
+          </div>
+
+          {tab === "inbox" && (
+            <div className="flex-1 overflow-y-auto max-h-[240px] p-2 space-y-1.5">
+              {cleaned.length === 0 && (
+                <p className="text-center text-[11px] text-stone-600 py-8">
+                  Kutusu boş. Telsiz sessiz.
                 </p>
               )}
-              {messages.map((m) => (
+              {cleaned.map((m) => (
                 <div
                   key={m.id}
-                  className={`rounded-sm border p-1.5 text-[10px] ${
-                    m.read
-                      ? "border-zinc-800 bg-zinc-900/80"
-                      : "border-amber-900/40 bg-zinc-900"
-                  }`}
+                  className="rounded-lg border border-stone-800 bg-stone-900/80 px-2.5 py-2"
                 >
-                  <div className="flex justify-between gap-1 text-[8px] text-zinc-500 mb-0.5 font-mono">
-                    <span className="text-amber-500/90 truncate max-w-[70%]">
+                  <div className="flex justify-between gap-2">
+                    <span className="text-[11px] font-semibold text-stone-200 truncate">
                       {m.from}
                     </span>
-                    <span>{m.type === "call" ? "ARAMA" : "SMS"}</span>
+                    <span className="text-[9px] text-stone-600 shrink-0">
+                      {m.type === "call" ? "ARA" : "SMS"}
+                    </span>
                   </div>
-                  <p className="text-zinc-300 leading-snug">{m.body}</p>
+                  <p className="text-[11px] text-stone-400 mt-0.5 leading-snug">
+                    {m.body}
+                  </p>
                 </div>
               ))}
             </div>
+          )}
 
-            {/* Tuş takımı — dekoratif 1987 */}
-            <div className="bg-zinc-900 border-t border-zinc-700 p-2">
-              <div className="grid grid-cols-3 gap-1">
-                {["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"].map(
-                  (k) => (
-                    <div
-                      key={k}
-                      className="h-7 rounded-sm bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[10px] text-zinc-500 font-mono select-none"
-                    >
-                      {k}
-                    </div>
-                  )
-                )}
-              </div>
-              <div className="mt-1.5 text-center text-[7px] text-zinc-600 font-mono tracking-widest">
-                NEXORA · BAKRAÇ · OTOGAR TYCOON
+          {tab === "home" && (
+            <div className="p-4 text-center space-y-3">
+              <p className="text-xs text-stone-400 leading-relaxed">
+                1987 Nexora el cihazı. Mesajlar süzülür; her sefer fişi ve her
+                ambient satır ekranı doldurmaz.
+              </p>
+              <p className="text-[10px] text-stone-600 font-serif italic">
+                “Yurtta sulh, cihanda sulh.”
+              </p>
+              <div className="grid grid-cols-3 gap-2 pt-2">
+                {["SMS", "SAAT", "RADYO"].map((x) => (
+                  <div
+                    key={x}
+                    className="rounded-lg border border-stone-800 py-3 text-[10px] text-stone-500"
+                  >
+                    {x}
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
+          )}
         </div>
-      )}
-    </>
+
+        {/* Tuş takımı görseli */}
+        <div className="p-3 grid grid-cols-3 gap-1.5">
+          {["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"].map(
+            (k) => (
+              <div
+                key={k}
+                className="h-8 rounded-md bg-stone-900 border border-stone-700 text-center text-xs text-stone-500 leading-8 font-mono"
+              >
+                {k}
+              </div>
+            )
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="mx-3 mb-3 py-2.5 rounded-xl bg-stone-800 border border-stone-600 text-sm text-stone-300"
+        >
+          Kapat
+        </button>
+      </div>
+    </div>
   );
 }
