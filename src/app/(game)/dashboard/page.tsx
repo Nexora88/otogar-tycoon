@@ -25,7 +25,6 @@ export default function DashboardPage() {
   const teaStock = useGameStore((s) => s.teaStock);
   const ağaEnergy = useGameStore((s) => s.ağaEnergy);
   const calendarTitle = useGameStore((s) => s.calendarTitle);
-  const calendarMood = useGameStore((s) => s.calendarMood);
 
   const active = useMemo(
     () =>
@@ -40,26 +39,33 @@ export default function DashboardPage() {
   const hint = useMemo(() => {
     if (mafiaDebtDue)
       return { href: "/office", t: "Kapıda aidat — ofisi aç" };
-    if (bankDebt > 0 && bankDebt > balance)
-      return { href: "/office", t: "Banka borcu kritik" };
+    if (bankDebt > 0 && bankDebt >= balance)
+      return { href: "/office", t: "Banka borcu kritik — ödeme planı" };
     if (active.length === 0 && buses.length > 0)
       return { href: "/expeditions", t: "Filo boşta — sefer kur" };
     if (reputation < 40)
       return { href: "/staff", t: "İtibar toparla — kadro & ikram" };
-    return { href: "/map", t: "Haritadan hat seç" };
+    return { href: "/map", t: "Haritadan hat seç, peronu yönet" };
   }, [mafiaDebtDue, bankDebt, balance, active.length, buses.length, reputation]);
 
   return (
-    <div className="min-h-full bg-zinc-950">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-28">
-        {/* Hero HQ */}
-        <section className="relative overflow-hidden rounded-3xl border border-zinc-800/90 bg-zinc-900/80 mb-6">
-          <div className="absolute inset-0 bg-gradient-to-br from-amber-600/10 via-transparent to-cyan-600/5" />
-          <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-amber-500/10 blur-3xl" />
+    <div className="min-h-full bg-[#0c0a08] text-stone-100">
+      {/* Hafif ambient */}
+      <div className="pointer-events-none fixed inset-0 opacity-40">
+        <div className="absolute top-0 left-1/4 w-96 h-64 bg-amber-600/15 blur-[100px] rounded-full" />
+        <div className="absolute bottom-1/4 right-0 w-72 h-72 bg-orange-700/10 blur-[80px] rounded-full" />
+      </div>
 
-          <div className="relative p-5 sm:p-7 flex flex-col sm:flex-row gap-6">
-            <div className="shrink-0">
-              <div className="w-24 h-30 sm:w-28 sm:h-[8.5rem] rounded-2xl border border-amber-900/40 bg-zinc-950 overflow-hidden shadow-xl">
+      <div className="relative max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-28">
+        {/* HQ kart */}
+        <section className="relative overflow-hidden rounded-3xl border border-amber-900/40 bg-gradient-to-br from-[#2a1810] via-[#1a1410] to-[#12100e] mb-5 shadow-xl shadow-orange-950/20">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,#f59e0b18,transparent_55%)]" />
+          <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-amber-500/10 blur-3xl" />
+
+          <div className="relative p-5 sm:p-6 flex flex-col sm:flex-row gap-5">
+            {/* Portre */}
+            <div className="shrink-0 self-center sm:self-start">
+              <div className="w-[100px] h-[128px] rounded-2xl border-2 border-amber-700/50 bg-[#1a120c] overflow-hidden shadow-[0_0_24px_-4px_rgba(245,158,11,0.35)] relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/ataturk.jpg"
@@ -67,104 +73,118 @@ export default function DashboardPage() {
                   className="w-full h-full object-cover object-top"
                   onError={(e) => {
                     e.currentTarget.style.display = "none";
-                    const f = e.currentTarget.parentElement?.querySelector(
+                    const fb = e.currentTarget.parentElement?.querySelector(
                       "[data-fb]"
                     ) as HTMLElement | null;
-                    if (f) f.style.display = "flex";
+                    if (fb) fb.style.display = "flex";
                   }}
                 />
                 <div
                   data-fb
-                  className="hidden h-full min-h-[8rem] flex-col items-center justify-center text-amber-500/70 font-serif text-2xl"
+                  className="hidden absolute inset-0 flex-col items-center justify-center bg-gradient-to-b from-amber-950/80 to-[#1a120c] text-amber-400/90"
                 >
-                  A
+                  <span className="text-3xl font-serif">★</span>
+                  <span className="text-[9px] tracking-widest mt-2 text-amber-600/80">
+                    ATATÜRK
+                  </span>
+                  <span className="text-[8px] text-zinc-600 mt-1 px-2 text-center">
+                    public/ataturk.jpg
+                  </span>
                 </div>
               </div>
-              <p className="text-[9px] text-center text-zinc-600 tracking-[0.2em] mt-2">
+              <p className="text-[9px] text-center text-amber-700/80 tracking-[0.18em] mt-2 font-medium">
                 M. KEMAL ATATÜRK
               </p>
             </div>
 
             <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold tracking-[0.2em] text-amber-500/90">
+              <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold tracking-[0.2em] text-amber-500">
                 <span>YAZIHANE</span>
-                <span className="text-zinc-700">·</span>
-                <span>1987</span>
+                <span className="text-amber-900">·</span>
+                <span className="text-orange-400/90">1987</span>
                 {calendarTitle && (
-                  <span className="text-zinc-400 tracking-normal font-normal">
+                  <span className="text-stone-500 tracking-normal font-normal">
                     · {calendarTitle}
                   </span>
                 )}
               </div>
-              <h1 className="text-3xl sm:text-4xl font-black tracking-tight mt-1 truncate">
+              <h1 className="text-3xl sm:text-4xl font-black tracking-tight mt-1 truncate text-transparent bg-clip-text bg-gradient-to-r from-amber-100 via-orange-100 to-amber-200">
                 {companyName || "Şirket"}
               </h1>
-              <p className="text-sm text-zinc-500 mt-1">
+              <p className="text-sm text-stone-500 mt-1">
                 {officeTitle || "Panel"} · Gün {gameDay} ·{" "}
-                {String(gameHour).padStart(2, "0")}:00 · Mazot {fuelPrice} ₺
+                {String(gameHour).padStart(2, "0")}:00 · Mazot{" "}
+                <span className="text-amber-600/90">{fuelPrice} ₺</span>
               </p>
 
-              <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <Kpi label="Kasa" value={formatMoney(balance)} hot />
-                <Kpi label="İtibar" value={`${reputation}`} />
-                <Kpi label="Filo" value={`${buses.length}`} />
-                <Kpi label="Aktif" value={`${active.length}`} />
+              <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <Kpi label="Kasa" value={formatMoney(balance)} tone="amber" />
+                <Kpi label="İtibar" value={`${reputation}`} tone="orange" />
+                <Kpi label="Filo" value={`${buses.length}`} tone="cyan" />
+                <Kpi label="Aktif" value={`${active.length}`} tone="emerald" />
               </div>
             </div>
           </div>
 
           {(bankDebt > 0 || taxDue > 0 || mafiaDebtDue) && (
-            <div className="relative border-t border-zinc-800 px-5 sm:px-7 py-2.5 flex flex-wrap gap-4 text-[11px]">
+            <div className="relative border-t border-amber-950/80 px-5 py-2.5 flex flex-wrap gap-4 text-[11px] bg-black/20">
               {bankDebt > 0 && (
-                <Link href="/office" className="text-red-400 hover:text-red-300">
-                  Borç {formatMoney(bankDebt)}
+                <Link
+                  href="/office"
+                  className="text-red-400 hover:text-red-300 font-medium"
+                >
+                  Borç {formatMoney(bankDebt)} →
                 </Link>
               )}
               {taxDue > 0 && (
-                <span className="text-amber-500">Vergi {formatMoney(taxDue)}</span>
+                <span className="text-amber-500">
+                  Vergi {formatMoney(taxDue)}
+                </span>
               )}
               {mafiaDebtDue && (
-                <span className="text-red-300 font-medium">Kapı — aidat</span>
+                <span className="text-orange-300 font-medium animate-pulse">
+                  Kapı — aidat
+                </span>
               )}
             </div>
           )}
         </section>
 
-        {/* CTA */}
+        {/* Sonraki hamle */}
         <Link
           href={hint.href}
-          className="mb-6 flex items-center justify-between rounded-2xl border border-amber-600/30 bg-gradient-to-r from-amber-950/40 to-transparent px-5 py-4 hover:border-amber-500/50 transition"
+          className="mb-5 flex items-center justify-between rounded-2xl border border-orange-600/40 bg-gradient-to-r from-orange-950/50 via-amber-950/30 to-transparent px-5 py-4 hover:border-orange-500/60 transition shadow-lg shadow-orange-950/20"
         >
           <div>
-            <div className="text-[10px] tracking-[0.2em] text-amber-600 font-bold">
+            <div className="text-[10px] tracking-[0.2em] text-orange-400 font-bold">
               SONRAKİ HAMLE
             </div>
             <div className="text-sm sm:text-base text-amber-50 mt-0.5">
               {hint.t}
             </div>
           </div>
-          <span className="text-amber-400 text-xl">→</span>
+          <span className="text-orange-400 text-xl">→</span>
         </Link>
 
-        <div className="grid lg:grid-cols-5 gap-4 mb-6">
-          <section className="lg:col-span-3 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-[10px] tracking-[0.2em] text-zinc-500 font-bold">
+        <div className="grid lg:grid-cols-5 gap-4 mb-5">
+          <section className="lg:col-span-3 rounded-2xl border border-amber-900/30 bg-[#161210]/90 p-5">
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="text-[10px] tracking-[0.2em] text-amber-600/90 font-bold">
                 CANLI SEFERLER
               </h2>
               <Link
                 href="/expeditions"
-                className="text-[11px] text-amber-500/80 hover:text-amber-400"
+                className="text-[11px] text-orange-400/90 hover:text-orange-300"
               >
                 Tümü
               </Link>
             </div>
             {active.length === 0 ? (
-              <div className="py-10 text-center">
-                <p className="text-sm text-zinc-600">Yolda araç yok</p>
+              <div className="py-8 text-center">
+                <p className="text-sm text-stone-600">Yolda araç yok</p>
                 <Link
                   href="/expeditions"
-                  className="inline-block mt-3 text-sm text-amber-500 hover:underline"
+                  className="inline-block mt-2 text-sm text-amber-500 hover:underline"
                 >
                   Sefer oluştur
                 </Link>
@@ -174,18 +194,21 @@ export default function DashboardPage() {
                 {active.slice(0, 6).map((e) => (
                   <li
                     key={e.id}
-                    className="flex items-center gap-3 rounded-xl bg-zinc-950/80 border border-zinc-800/80 px-3 py-3"
+                    className="flex items-center gap-3 rounded-xl bg-black/30 border border-amber-950/50 px-3 py-3"
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium truncate">
+                      <div className="text-sm font-medium truncate text-amber-50/95">
                         {e.origin} → {e.destination}
                       </div>
-                      <div className="text-[11px] text-zinc-500">
+                      <div className="text-[11px] text-stone-500">
                         {e.status === "filling" ? "Dolum" : "Yolda"} ·{" "}
-                        {e.soldTickets}/{e.maxSeats} · {e.ticketPrice} ₺
+                        {e.soldTickets}/{e.maxSeats} ·{" "}
+                        <span className="text-amber-600/80">
+                          {e.ticketPrice} ₺
+                        </span>
                       </div>
                     </div>
-                    <div className="w-14 h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+                    <div className="w-16 h-2 rounded-full bg-zinc-900 overflow-hidden">
                       <div
                         className="h-full bg-gradient-to-r from-amber-500 to-orange-400"
                         style={{
@@ -202,17 +225,17 @@ export default function DashboardPage() {
             )}
           </section>
 
-          <div className="lg:col-span-2 space-y-4">
-            <section className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5">
-              <div className="text-[10px] tracking-[0.2em] text-zinc-500 font-bold mb-2">
+          <div className="lg:col-span-2 space-y-3">
+            <section className="rounded-2xl border border-cyan-900/30 bg-[#12181c]/90 p-4">
+              <div className="text-[10px] tracking-[0.2em] text-cyan-600 font-bold mb-2">
                 GAZETE
               </div>
               {paper ? (
                 <>
-                  <h3 className="text-sm font-semibold leading-snug">
+                  <h3 className="text-sm font-semibold text-cyan-50/90 leading-snug">
                     {paper.headline || paper.title}
                   </h3>
-                  <p className="text-[12px] text-zinc-500 mt-1.5 line-clamp-3 leading-relaxed">
+                  <p className="text-[12px] text-stone-500 mt-1 line-clamp-3">
                     {paper.body}
                   </p>
                   <button
@@ -220,33 +243,35 @@ export default function DashboardPage() {
                     onClick={() =>
                       openPaperEdition(morningPaper[0] ? "morning" : "evening")
                     }
-                    className="mt-3 text-[11px] text-amber-500 hover:text-amber-400"
+                    className="mt-2 text-[11px] text-cyan-400 hover:text-cyan-300"
                   >
                     Baskıyı aç
                   </button>
                 </>
               ) : (
-                <p className="text-[12px] text-zinc-600 leading-relaxed">
-                  Manşet yok. Saat dolunca üretilir; sen açarsın.
+                <p className="text-[12px] text-stone-600">
+                  Manşet yok — saat dolunca üretilir.
                 </p>
               )}
             </section>
 
-            <section className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5">
+            <section className="rounded-2xl border border-orange-900/35 bg-[#1a1410] p-4">
               <div className="flex justify-between items-start">
                 <div>
-                  <div className="text-[10px] tracking-[0.2em] text-zinc-500 font-bold">
+                  <div className="text-[10px] tracking-[0.2em] text-orange-600 font-bold">
                     TERMOS
                   </div>
                   <div className="text-3xl font-mono text-amber-400 mt-1">
                     %{Math.round(ağaEnergy)}
                   </div>
-                  <div className="text-[11px] text-zinc-600">Stok {teaStock}</div>
+                  <div className="text-[11px] text-stone-600">
+                    Çay stok {teaStock}
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => drinkTea()}
-                  className="px-3 py-2 rounded-xl bg-zinc-800 border border-zinc-700 text-xs hover:border-amber-700/50"
+                  className="px-3 py-2 rounded-xl bg-gradient-to-r from-amber-700/40 to-orange-800/40 border border-amber-700/40 text-xs text-amber-100"
                 >
                   Yudumla
                 </button>
@@ -254,17 +279,19 @@ export default function DashboardPage() {
             </section>
 
             {fleet && (
-              <section className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5">
-                <div className="text-[10px] tracking-[0.2em] text-zinc-500 font-bold">
+              <section className="rounded-2xl border border-emerald-900/30 bg-[#0f1612] p-4">
+                <div className="text-[10px] tracking-[0.2em] text-emerald-600 font-bold">
                   BAŞ OTOBÜS
                 </div>
-                <div className="text-sm font-medium mt-1">{fleet.name}</div>
-                <div className="text-[11px] font-mono text-zinc-500">
-                  {fleet.plate} · %{fleet.engineHealth}
+                <div className="text-sm font-medium mt-1 text-emerald-50/90">
+                  {fleet.name}
+                </div>
+                <div className="text-[11px] font-mono text-stone-500">
+                  {fleet.plate} · motor %{fleet.engineHealth}
                 </div>
                 <Link
                   href="/garage"
-                  className="text-[11px] text-amber-500/80 mt-2 inline-block"
+                  className="text-[11px] text-emerald-500/90 mt-2 inline-block"
                 >
                   Garaj →
                 </Link>
@@ -273,33 +300,35 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <h2 className="text-[10px] tracking-[0.2em] text-zinc-600 font-bold mb-3">
+        <h2 className="text-[10px] tracking-[0.2em] text-amber-800 font-bold mb-2">
           ODALAR
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
           {[
-            ["/expeditions", "Seferler", "Kur & takip"],
-            ["/garage", "Garaj", "Boya & tamir"],
-            ["/office", "Ofis", "Banka & defter"],
-            ["/terminal", "Terminal", "İnşaat"],
-            ["/market", "Pazar", "Filo"],
-            ["/staff", "Kadro", "Mülakat"],
-            ["/map", "Harita", "Hatlar"],
-            ["/lobby", "Lobi", "Rakip"],
-            ["/events", "Etkinlik", "Açık oda"],
-          ].map(([href, title, sub]) => (
+            ["/expeditions", "Seferler", "Kur & takip", "border-amber-800/40"],
+            ["/garage", "Garaj", "Boya & tamir", "border-orange-900/40"],
+            ["/office", "Ofis", "Banka & defter", "border-red-900/35"],
+            ["/terminal", "Terminal", "İnşaat", "border-amber-900/35"],
+            ["/market", "Pazar", "Filo", "border-cyan-900/35"],
+            ["/staff", "Kadro", "Mülakat", "border-violet-900/30"],
+            ["/map", "Harita", "Hatlar", "border-emerald-900/30"],
+            ["/lobby", "Lobi", "Rakip", "border-sky-900/30"],
+            ["/events", "Etkinlik", "Açık oda", "border-rose-900/30"],
+          ].map(([href, title, sub, border]) => (
             <Link
               key={href}
               href={href}
-              className="rounded-2xl border border-zinc-800 bg-zinc-900/40 hover:border-amber-700/35 hover:bg-zinc-900/70 px-4 py-3.5 min-h-[76px] flex flex-col justify-center transition"
+              className={`rounded-2xl border ${border} bg-[#161210]/80 hover:bg-[#1c1610] px-4 py-3.5 min-h-[72px] flex flex-col justify-center transition hover:border-amber-600/40`}
             >
-              <span className="text-sm font-semibold">{title}</span>
-              <span className="text-[11px] text-zinc-500 mt-0.5">{sub}</span>
+              <span className="text-sm font-semibold text-amber-50/95">
+                {title}
+              </span>
+              <span className="text-[11px] text-stone-500 mt-0.5">{sub}</span>
             </Link>
           ))}
         </div>
 
-        <p className="mt-12 text-center text-[10px] text-zinc-600 tracking-wide">
+        <p className="mt-10 text-center text-[10px] text-amber-900/80 tracking-wide">
           Yurtta sulh, cihanda sulh · Gerçek para yok
         </p>
       </div>
@@ -310,22 +339,24 @@ export default function DashboardPage() {
 function Kpi({
   label,
   value,
-  hot,
+  tone,
 }: {
   label: string;
   value: string;
-  hot?: boolean;
+  tone: "amber" | "orange" | "cyan" | "emerald";
 }) {
+  const tones = {
+    amber: "text-amber-400 border-amber-800/40 bg-amber-950/30",
+    orange: "text-orange-300 border-orange-900/40 bg-orange-950/25",
+    cyan: "text-cyan-400 border-cyan-900/40 bg-cyan-950/25",
+    emerald: "text-emerald-400 border-emerald-900/40 bg-emerald-950/25",
+  };
   return (
-    <div className="rounded-2xl border border-zinc-800/90 bg-zinc-950/70 px-3 py-3">
-      <div className="text-[9px] uppercase tracking-wider text-zinc-600">
+    <div className={`rounded-xl border px-3 py-2.5 ${tones[tone]}`}>
+      <div className="text-[9px] uppercase tracking-wider text-stone-500">
         {label}
       </div>
-      <div
-        className={`text-lg font-semibold tabular-nums mt-0.5 truncate ${
-          hot ? "text-amber-400" : "text-zinc-100"
-        }`}
-      >
+      <div className="text-lg font-semibold tabular-nums mt-0.5 truncate">
         {value}
       </div>
     </div>
