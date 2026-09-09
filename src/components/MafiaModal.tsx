@@ -9,9 +9,51 @@ import {
   RACON_ESNAF,
   type MafiaBoss,
 } from "@/data/mafia";
-import { useGameStore, CITIES } from "@/store/gameStore";
+import { useGameStore, CITIES, type RegionalBoss } from "@/store/gameStore";
 
 type Phase = "closed" | "knock" | "talk" | "result";
+
+/** MafiaBoss / store boss → tek RegionalBoss */
+function toStoreBoss(b: MafiaBoss | RegionalBoss | Record<string, unknown>): RegionalBoss {
+  const any = b as Record<string, unknown>;
+  const tier = String(
+    any.type ?? any.kind ?? any.tier ?? "sahte"
+  ) as "hakiki" | "sahte";
+  const cost = Number(any.cost ?? any.weeklyFee ?? 0);
+  return {
+    id: String(any.id ?? "boss"),
+    bossName: String(any.bossName ?? "İsimsiz"),
+    message: String(any.message ?? any.messageTemplate ?? ""),
+    cost,
+    type: tier,
+    region: String(any.region ?? "Peron"),
+    tier,
+    kind: tier,
+    weeklyFee: cost,
+    cities: (any.cities as string[]) || [],
+    refuseLine: String(any.refuseLine ?? "Kapı küsünce gece uzun olur."),
+    payLine: String(any.payLine ?? "Bu hafta tamam. Yolun açık."),
+    messageTemplate: String(any.messageTemplate ?? any.message ?? ""),
+  };
+}
+
+function toModalBoss(b: RegionalBoss | MafiaBoss): MafiaBoss {
+  const s = toStoreBoss(b);
+  return {
+    id: s.id,
+    region: s.region,
+    cities: s.cities || [],
+    bossName: s.bossName,
+    tier: s.type,
+    weeklyFee: s.cost,
+    message: s.message,
+    refuseLine: s.refuseLine || "",
+    payLine: s.payLine || "",
+    kind: s.type,
+    cost: s.cost,
+    messageTemplate: s.messageTemplate || s.message,
+  };
+}
 
 export default function MafiaModal() {
   const [phase, setPhase] = useState<Phase>("closed");
@@ -30,101 +72,91 @@ export default function MafiaModal() {
   const mafiaVisit = useGameStore((s) => s.mafiaVisit);
   const spendMoney = useGameStore((s) => s.spendMoney);
   const addLedger = useGameStore((s) => s.addLedger);
+  const pushPhone = useGameStore((s) => s.pushPhone);
 
   const cityName =
     CITIES.find((c) => c.id === homeCityId)?.name || "İstanbul";
 
-  const assignActiveBoss = (nextBoss: MafiaBoss | null, due = true) => {
+  const setActive = (b: MafiaBoss | RegionalBoss) => {
     useGameStore.setState({
-      activeBoss: nextBoss as any,
-      mafiaDebtDue: due,
+      activeBoss: toStoreBoss(b),
+      mafiaDebtDue: true,
     });
   };
 
-  const clearActiveBoss = () => {
-    useGameStore.setState({
-      activeBoss: null as any,
-      mafiaDebtDue: false,
-    });
+  const clearActive = () => {
+    useGameStore.setState({ activeBoss: null, mafiaDebtDue: false });
   };
 
-  // Store’dan aidat geldiyse modal aç
+  // Store’dan kapı
   useEffect(() => {
     if (mafiaDebtDue && activeBoss && phase === "closed") {
-      const selectedBoss = activeBoss as any;
-
-      setBoss({
-        ...selectedBoss,
-        kind: selectedBoss.type ?? selectedBoss.kind ?? "sahte",
-        cost: selectedBoss.weeklyFee ?? selectedBoss.cost ?? 0,
-        messageTemplate: selectedBoss.message ?? "",
-        payLine: selectedBoss.payLine ?? "",
-        refuseLine: selectedBoss.refuseLine ?? "",
-        type: selectedBoss.type ?? selectedBoss.kind ?? "sahte",
-      } as MafiaBoss);
-
+      setBoss(toModalBoss(activeBoss));
       setKnown(false);
+      setResult("");
       setPhase("knock");
     }
   }, [mafiaDebtDue, activeBoss, phase]);
 
-  // Demo / seyrek rastgele (setup sonrası)
+  // Seyrek rastgele ziyaret
   useEffect(() => {
     if (!setupDone) return;
     const t = setInterval(() => {
       if (phase !== "closed" || mafiaDebtDue) return;
-      if (Math.random() > 0.94) {
+      if (Math.random() > 0.92) {
         mafiaVisit();
       }
-    }, 60000);
+    }, 90000);
     return () => clearInterval(t);
   }, [phase, setupDone, mafiaDebtDue, mafiaVisit]);
 
   if (phase === "closed" || !boss) return null;
 
-  const msg = fillTemplate(boss.messageTemplate, playerName || "Ağa", boss.cost);
+  const msg = fillTemplate(
+    boss.messageTemplate || boss.message,
+    playerName || "Ağa",
+    boss.cost
+  );
+  const isReal = boss.kind === "hakiki" || boss.tier === "hakiki";
 
   const intel = () => {
     if (!spendMoney(500)) {
       setResult("İstihbarat için 500 ₺ yok.");
+      setPhase("result");
       return;
     }
     addLedger("İstihbarat", -500);
     setKnown(true);
     setResult(
-      boss.kind === "hakiki"
+      isReal
         ? "İstihbarat: Bu iş ciddi. Boş lafa gelmezler."
         : "İstihbarat: Peron faresi. Raconla korkutulabilir."
     );
   };
 
   const pay = () => {
-    // Store’a boss yazılı değilse yaz
-    if (!activeBoss) {
-      assignActiveBoss(boss);
-    }
-
-    if (balance < boss.cost) {
-      setResult(`Kasa yetmedi (${boss.cost} ₺). Bakiye: ${balance} ₺`);
-      setPhase("result");
-      return;
-    }
-
+    setActive(boss);
     payMafia();
-    setResult(`${boss.bossName}: “${boss.payLine}”`);
+    const stillDue = useGameStore.getState().mafiaDebtDue;
+    if (!stillDue) {
+      setResult(`${boss.bossName}: “${boss.payLine}”`);
+    } else {
+      setResult(
+        `Kasa yetmedi (${boss.cost} ₺). Bakiye: ${balance} ₺`
+      );
+    }
     setPhase("result");
   };
 
   const raconHard = () => {
-    if (boss.kind === "sahte") {
-      clearActiveBoss();
+    if (!isReal) {
+      clearActive();
       setResult(
         `${RACON_DELIKANLI}\n\n${boss.bossName}: “T-tamam ağa… yanlış anlama… biz de şaka… gideriz.”\n\nBedava kurtuldun.`
       );
+      pushPhone("İstihbarat", "Sahte kabadayı geri çekildi.");
     } else {
-      if (!activeBoss) {
-        assignActiveBoss(boss);
-      }
+      setActive(boss);
       refuseMafia();
       setResult(
         `${RACON_DELIKANLI}\n\n${boss.bossName}: “Racon senin olsun ${playerName || "Ağa"}. Biz de raconumuzu gece yazarız.”\n\n${boss.refuseLine}`
@@ -134,14 +166,17 @@ export default function MafiaModal() {
   };
 
   const raconSoft = () => {
-    const fee = Math.min(boss.cost, Math.max(800, Math.floor(boss.cost * 0.4)));
+    const fee = Math.min(
+      boss.cost,
+      Math.max(800, Math.floor(boss.cost * 0.4))
+    );
     if (!spendMoney(fee)) {
       setResult("Çorba parası için kasa yetmedi.");
       setPhase("result");
       return;
     }
     addLedger("Çorba parası", -fee);
-    clearActiveBoss();
+    clearActive();
     setResult(
       `${RACON_ESNAF}\n\n${boss.bossName}: “Anlaştık kaptan. ${fee} ₺ ile defter kapandı. Yolun açık.”`
     );
@@ -152,19 +187,19 @@ export default function MafiaModal() {
     const line = HARASS_LINES[
       Math.floor(Math.random() * HARASS_LINES.length)
     ]!.replace(/\{name\}/g, playerName || "Ağa");
-    if (boss.kind === "hakiki") {
-      if (!activeBoss) {
-        assignActiveBoss(boss);
-      }
+
+    if (isReal) {
+      setActive(boss);
       refuseMafia();
       setResult(
         `${boss.bossName}: “${line}”\n\nKapıyı kapattın. ${boss.refuseLine}`
       );
     } else {
-      clearActiveBoss();
+      clearActive();
       setResult(
         `${boss.bossName}: “${line}”\n\nBlöf. Bir süre taciz mesajı gelebilir.`
       );
+      pushPhone(boss.bossName, line);
     }
     setPhase("result");
   };
@@ -203,8 +238,7 @@ export default function MafiaModal() {
         {phase === "talk" && (
           <>
             <div className="text-[10px] tracking-widest text-red-400 font-bold">
-              {boss.region.toUpperCase()} ·{" "}
-              {boss.kind === "hakiki" ? "AĞIR" : "ŞÜPHELİ"}
+              {boss.region.toUpperCase()} · {isReal ? "AĞIR" : "ŞÜPHELİ"}
             </div>
             <h2 className="text-lg font-bold text-white mt-1">
               {boss.bossName}
@@ -215,10 +249,10 @@ export default function MafiaModal() {
             {known && (
               <p
                 className={`text-xs mt-3 font-semibold ${
-                  boss.kind === "hakiki" ? "text-red-400" : "text-emerald-400"
+                  isReal ? "text-red-400" : "text-emerald-400"
                 }`}
               >
-                {boss.kind === "hakiki"
+                {isReal
                   ? "İstihbarat: HAKİKİ — reddetmek tehlikeli"
                   : "İstihbarat: SAHTE — racon işe yarayabilir"}
               </p>

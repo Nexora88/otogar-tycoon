@@ -1,267 +1,226 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { useGameStore } from "@/store/gameStore";
-import { useCareerStore, RANK_LABEL } from "@/store/careerStore";
-import { TelsizTicker } from "@/components/TelsizTicker";
-import { RadioPanel } from "@/components/RadioPanel";
-import NewspaperModal from "@/components/NewspaperModal";
-import PhoneUI from "@/components/PhoneUI";
-import MafiaModal from "@/components/MafiaModal";
+import { useCareerStore } from "@/store/careerStore";
 import { formatMoney } from "@/lib/utils";
-import {
-  LayoutDashboard,
-  Bus,
-  Route,
-  Building2,
-  Map,
-  Store,
-  Warehouse,
-  Radio,
-  Users,
-  Briefcase,
-  Newspaper,
-} from "lucide-react";
+import PhoneUI from "@/components/PhoneUI";
+import NewspaperModal from "@/components/NewspaperModal";
+import MafiaModal from "@/components/MafiaModal";
+import MeetingModal from "@/components/MeetingModal";
+import TicketReceipt from "@/components/TicketReceipt";
+import ComplaintModal from "@/components/ComplaintModal";
+import { CalendarMood } from "@/components/CalendarMood";
 
-const NAV: {
-  href: string;
-  label: string;
-  icon: React.ElementType;
-  tycoonOnly?: boolean;
-}[] = [
-  { href: "/shift", label: "Vardiya", icon: Briefcase },
-  { href: "/dashboard", label: "Panel", icon: LayoutDashboard },
-  { href: "/map", label: "Harita", icon: Map, tycoonOnly: true },
-  { href: "/expeditions", label: "Seferler", icon: Route, tycoonOnly: true },
-  { href: "/garage", label: "Garaj", icon: Bus, tycoonOnly: true },
-  { href: "/market", label: "Pazar", icon: Store, tycoonOnly: true },
-  { href: "/office", label: "Ofis", icon: Building2, tycoonOnly: true },
-  { href: "/terminal", label: "Terminal", icon: Warehouse, tycoonOnly: true },
-  { href: "/staff", label: "Kadro", icon: Users, tycoonOnly: true },
-  { href: "/lobby", label: "Lobi", icon: Radio },
-];
+const NAV: { href: string; label: string; icon: string; needBoss?: boolean }[] =
+  [
+    { href: "/dashboard", label: "Panel", icon: "▣" },
+    { href: "/shift", label: "Vardiya", icon: "◎" },
+    { href: "/map", label: "Harita", icon: "◈", needBoss: true },
+    { href: "/expeditions", label: "Sefer", icon: "▸", needBoss: true },
+    { href: "/garage", label: "Garaj", icon: "▣", needBoss: true },
+    { href: "/office", label: "Ofis", icon: "▤", needBoss: true },
+    { href: "/terminal", label: "Terminal", icon: "▦", needBoss: true },
+    { href: "/market", label: "Pazar", icon: "◇", needBoss: true },
+    { href: "/lobby", label: "Lobi", icon: "◎" },
+    { href: "/staff", label: "Kadro", icon: "☺", needBoss: true },
+    { href: "/auction", label: "Borsa", icon: "⚡", needBoss: true },
+  ];
 
 export default function GameLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const path = usePathname();
+  const pathname = usePathname();
+  const router = useRouter();
 
   const balance = useGameStore((s) => s.balance);
   const reputation = useGameStore((s) => s.reputation);
   const companyName = useGameStore((s) => s.companyName);
   const gameDay = useGameStore((s) => s.gameDay);
   const gameHour = useGameStore((s) => s.gameHour);
+  const gameYear = useGameStore((s) => s.gameYear);
   const paperNotify = useGameStore((s) => s.paperNotify);
-  const mafiaDebtDue = useGameStore((s) => s.mafiaDebtDue);
-  const activeBoss = useGameStore((s) => s.activeBoss);
+  const openPaperEdition = useGameStore((s) => s.openPaperEdition);
+  const clearPaperNotify = useGameStore((s) => s.clearPaperNotify);
+  const tickGameTime = useGameStore((s) => s.tickGameTime);
+  const forceRegister = useGameStore((s) => s.forceRegister);
+  const isGuest = useGameStore((s) => s.isGuest);
+  const setupDone = useGameStore((s) => s.setupDone);
   const bankDebt = useGameStore((s) => s.bankDebt);
   const taxDue = useGameStore((s) => s.taxDue);
-  const openNewspaper = useGameStore((s) => s.openNewspaper);
-  const openPaperEdition = useGameStore((s) => s.openPaperEdition);
-  const tickGameTime = useGameStore((s) => s.tickGameTime);
-  const setPhoneOpen = useGameStore((s) => s.setPhoneOpen);
+  const mafiaDebtDue = useGameStore((s) => s.mafiaDebtDue);
+  const calendarMood = useGameStore((s) => s.calendarMood);
+  const calendarTitle = useGameStore((s) => s.calendarTitle);
+  const fuelPrice = useGameStore((s) => s.fuelPrice);
 
   const careerStarted = useCareerStore((s) => s.careerStarted);
   const careerDone = useCareerStore((s) => s.careerDone);
   const rank = useCareerStore((s) => s.rank);
   const displayHitap = useCareerStore((s) => s.displayHitap);
-  const savings = useCareerStore((s) => s.savings);
 
-  const [mounted, setMounted] = useState(false);
+  const isBoss = careerDone || setupDone || rank === "bagimsiz";
 
+  // Saat / gün nabzı
   useEffect(() => {
-    setMounted(true);
     tickGameTime();
-    const id = setInterval(() => tickGameTime(), 4000);
+    const id = setInterval(() => tickGameTime(), 15000);
     return () => clearInterval(id);
   }, [tickGameTime]);
 
-  const isCirak = careerStarted && !careerDone;
+  // Misafir süresi
+  useEffect(() => {
+    if (forceRegister && isGuest) {
+      // soft uyarı — hard redirect istersen /register
+    }
+  }, [forceRegister, isGuest]);
+
+  const mourning = calendarMood === "mourning";
+  const national = calendarMood === "national";
 
   return (
-    <div className="min-h-screen bg-[#0a0c10] text-zinc-100 flex flex-col md:flex-row">
-      <aside className="hidden md:flex w-56 flex-col border-r border-zinc-800/80 bg-zinc-950/90 shrink-0">
-        <div className="p-4 border-b border-zinc-800">
-          <div className="text-[10px] tracking-[0.2em] text-amber-600 font-bold">
-            OTOGAR TYCOON
-          </div>
-          <div className="text-sm font-semibold mt-1 truncate">
-            {isCirak ? displayHitap || "Çırak" : companyName}
-          </div>
-          <div className="text-[11px] text-zinc-500 mt-0.5">
-            1987 · Gün {gameDay} · {String(gameHour).padStart(2, "0")}:00
-          </div>
-          {isCirak && (
-            <div className="mt-2 text-[10px] px-2 py-1 rounded bg-amber-950/50 text-amber-400 border border-amber-900/40">
-              {RANK_LABEL[rank]} · {savings} ₺
+    <div
+      className={`min-h-screen text-zinc-100 flex flex-col ${
+        mourning ? "bg-black" : national ? "bg-[#0c0a06]" : "bg-zinc-950"
+      }`}
+    >
+      <CalendarMood />
+
+      {/* Üst şerit */}
+      <header
+        className={`sticky top-0 z-30 border-b backdrop-blur-md ${
+          mourning
+            ? "border-zinc-800 bg-black/90"
+            : "border-zinc-800/80 bg-zinc-950/90"
+        }`}
+      >
+        <div className="max-w-6xl mx-auto px-3 py-2 flex flex-wrap items-center gap-2 justify-between">
+          <div className="min-w-0">
+            <div className="text-[10px] tracking-[0.2em] text-amber-600 font-bold">
+              OTOGAR TYCOON · {gameYear || 1987}
             </div>
-          )}
+            <div className="font-semibold text-sm truncate">
+              {companyName || displayHitap || "Yazıhane"}
+            </div>
+            <div className="text-[10px] text-zinc-500">
+              Gün {gameDay} · {String(gameHour).padStart(2, "0")}:00
+              {calendarTitle ? ` · ${calendarTitle}` : ""}
+              {" · "}mazot {fuelPrice} ₺
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 text-xs">
+            <div className="text-right">
+              <div className="font-mono text-emerald-400 text-sm">
+                {formatMoney(balance)}
+              </div>
+              <div className="text-zinc-500">itibar {reputation}</div>
+            </div>
+            {(bankDebt > 0 || taxDue > 0) && (
+              <button
+                type="button"
+                onClick={() => router.push("/office")}
+                className="text-[10px] px-2 py-1 rounded border border-red-900/60 text-red-300"
+              >
+                Borç {bankDebt > 0 ? formatMoney(bankDebt) : ""}
+                {taxDue > 0 ? ` · vergi` : ""}
+              </button>
+            )}
+            {mafiaDebtDue && (
+              <span className="text-[10px] px-2 py-1 rounded bg-red-950 text-red-300 border border-red-800 animate-pulse">
+                Kapı
+              </span>
+            )}
+            {paperNotify && (
+              <button
+                type="button"
+                onClick={() => openPaperEdition(paperNotify)}
+                className="text-[10px] px-2 py-1 rounded bg-amber-900/40 text-amber-200 border border-amber-800"
+              >
+                Gazete
+                {paperNotify === "evening" ? " (akşam)" : " (sabah)"}
+              </button>
+            )}
+            {forceRegister && isGuest && (
+              <Link
+                href="/register"
+                className="text-[10px] px-2 py-1 rounded bg-cyan-900/50 text-cyan-200 border border-cyan-800"
+              >
+                Hesap aç
+              </Link>
+            )}
+          </div>
         </div>
 
-        <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
+        {/* Nav */}
+        <nav className="max-w-6xl mx-auto px-2 pb-2 flex gap-1 overflow-x-auto text-[11px]">
           {NAV.map((item) => {
-            const locked = Boolean(item.tycoonOnly && isCirak);
-            const active = path.startsWith(item.href);
-            const Icon = item.icon;
-            if (locked) {
-              return (
-                <div
-                  key={item.href}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-zinc-600 cursor-not-allowed"
-                  title="Bağımsız olunca açılır"
-                >
-                  <Icon className="w-4 h-4 opacity-40" />
-                  {item.label}
-                  <span className="ml-auto text-[9px]">🔒</span>
-                </div>
-              );
+            if (item.needBoss && !isBoss && careerStarted) {
+              return null;
             }
+            const active = pathname?.startsWith(item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors ${
+                className={`shrink-0 px-2.5 py-1.5 rounded-lg border ${
                   active
-                    ? "bg-amber-500/15 text-amber-300 border border-amber-700/40"
-                    : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 border border-transparent"
+                    ? "border-amber-600 bg-amber-950/40 text-amber-100"
+                    : "border-transparent text-zinc-500 hover:text-zinc-300"
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <span className="mr-1 opacity-70">{item.icon}</span>
                 {item.label}
               </Link>
             );
           })}
         </nav>
+      </header>
 
-        <TelsizTicker />
-
-        <div className="px-3 pb-2">
-          <RadioPanel compact />
+      {/* Yas / bayram şeridi */}
+      {(mourning || national) && (
+        <div
+          className={`text-center text-[11px] py-1.5 font-semibold tracking-wide ${
+            mourning
+              ? "bg-zinc-900 text-zinc-400"
+              : "bg-amber-950/50 text-amber-200"
+          }`}
+        >
+          {mourning
+            ? "Saygı günü — peronlar sessiz"
+            : `Ulusal coşku — ${calendarTitle || "bayram"}`}
         </div>
+      )}
 
-        <div className="p-3 border-t border-zinc-800 space-y-2">
-          <div className="flex justify-between text-xs">
-            <span className="text-zinc-500">Kasa</span>
-            <span className="font-mono text-emerald-400">
-              {mounted ? formatMoney(balance) : "—"}
-            </span>
-          </div>
-          <div className="flex justify-between text-xs">
-            <span className="text-zinc-500">İtibar</span>
-            <span className="text-cyan-400">{reputation}</span>
-          </div>
-          {bankDebt > 0 && (
-            <div className="flex justify-between text-xs text-red-400/90">
-              <span>Banka borcu</span>
-              <span className="font-mono">{formatMoney(bankDebt)}</span>
-            </div>
-          )}
-          {taxDue > 0 && (
-            <div className="flex justify-between text-xs text-amber-500/90">
-              <span>Vergi</span>
-              <span className="font-mono">{formatMoney(taxDue)}</span>
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => openNewspaper()}
-            className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-zinc-700 text-xs hover:border-amber-600"
-          >
-            <Newspaper className="w-3.5 h-3.5" />
-            Gazete
-            {paperNotify && (
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => setPhoneOpen(true)}
-            className="w-full py-2 rounded-lg bg-zinc-900 border border-zinc-700 text-xs"
-          >
-            Telefon
-          </button>
-          <Link
-            href="/office"
-            className="block text-center text-[10px] text-zinc-600 hover:text-zinc-400"
-          >
-            Ofis / borç öde
-          </Link>
-        </div>
-      </aside>
+      <main className="flex-1 max-w-6xl w-full mx-auto">{children}</main>
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-30 border-b border-zinc-800/80 bg-[#0a0c10]/95 backdrop-blur px-3 py-2 flex items-center gap-2 flex-wrap">
-          <div className="md:hidden text-[10px] font-bold text-amber-600 tracking-widest">
-            OTOGAR
-          </div>
-          <div className="flex-1 text-xs text-zinc-500 truncate min-w-[8rem]">
-            {mounted && (
-              <>
-                Gün {gameDay} · {String(gameHour).padStart(2, "0")}:00 ·{" "}
-                <span className="text-emerald-400/90">
-                  {formatMoney(balance)}
-                </span>
-              </>
-            )}
-          </div>
-          {bankDebt > 0 && (
-            <Link
-              href="/office"
-              className="text-[10px] px-2 py-1 rounded bg-red-950/80 border border-red-900 text-red-300"
-            >
-              Borç {formatMoney(bankDebt)}
-            </Link>
-          )}
-          {mafiaDebtDue && (
-            <Link
-              href="/office"
-              className="text-[10px] px-2 py-1 rounded bg-red-950 border border-red-800 text-red-300 animate-pulse"
-            >
-              {activeBoss?.bossName || "Aidat"}!
-            </Link>
-          )}
-          {paperNotify && (
-            <button
-              type="button"
-              onClick={() => openPaperEdition(paperNotify)}
-              className="text-[10px] px-2 py-1 rounded bg-amber-950 border border-amber-800 text-amber-300"
-            >
-              {paperNotify === "morning" ? "Sabah baskı" : "Akşam baskı"}
-            </button>
-          )}
-        </header>
+      {/* Alt mobilde hızlı link */}
+      <footer className="md:hidden sticky bottom-0 z-20 border-t border-zinc-800 bg-zinc-950/95 px-2 py-1.5 flex justify-around text-[10px] text-zinc-500">
+        <Link href="/shift">Vardiya</Link>
+        <Link href="/dashboard">Panel</Link>
+        <Link href="/lobby">Lobi</Link>
+        <Link href="/office">Ofis</Link>
+        <button
+          type="button"
+          onClick={() => {
+            if (paperNotify) openPaperEdition(paperNotify);
+            else openPaperEdition("morning");
+          }}
+        >
+          Gazete
+        </button>
+      </footer>
 
-        <main className="flex-1 overflow-auto pb-20 md:pb-6">{children}</main>
-
-        <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-zinc-800 bg-zinc-950/95 backdrop-blur flex overflow-x-auto">
-          {NAV.filter((n) => !n.tycoonOnly || !isCirak)
-            .slice(0, 6)
-            .map((item) => {
-              const Icon = item.icon;
-              const active = path.startsWith(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex-1 min-w-[4.5rem] flex flex-col items-center py-2 text-[10px] ${
-                    active ? "text-amber-400" : "text-zinc-500"
-                  }`}
-                >
-                  <Icon className="w-4 h-4 mb-0.5" />
-                  {item.label}
-                </Link>
-              );
-            })}
-        </nav>
-      </div>
-
-      <NewspaperModal />
+      {/* Modallar / ambient UI */}
       <PhoneUI />
+      <NewspaperModal />
       <MafiaModal />
+      <MeetingModal />
+      <TicketReceipt />
+      <ComplaintModal />
     </div>
   );
 }
