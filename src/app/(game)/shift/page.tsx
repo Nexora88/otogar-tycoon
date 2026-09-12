@@ -1,281 +1,31 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useCareerStore } from "@/store/careerStore";
-import { RANK_LABEL, MEMLEKET_HITAP, rankNeed } from "@/store/careerStore";
-// rankNeed careerStore'da export; yoksa apprenticeContent'ten
+import { useCareerStore, RANK_LABEL, MEMLEKET_HITAP } from "@/store/careerStore";
 import { useGameStore } from "@/store/gameStore";
 
-export default function ShiftPage() {
-  const gameHour = useGameStore((s) => s.gameHour);
-  const c = useCareerStore();
-  const [name, setName] = useState("");
-  const [mem, setMem] = useState(MEMLEKET_HITAP[0] || "Keşanlı");
+const css = `
+@keyframes busMove{0%{transform:translateX(-120px)}100%{transform:translateX(calc(100vw + 120px))}}
+@keyframes walk{0%,100%{transform:translateY(0) rotate(-1deg)}50%{transform:translateY(-5px) rotate(1deg)}}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulseAmber{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,.12)}50%{box-shadow:0 0 0 12px rgba(245,158,11,0)}}
+@keyframes blink{50%{opacity:.35}}
+.scene-in{animation:fadeUp .45s ease both}.bus{animation:busMove 13s linear infinite}.walk{animation:walk .7s ease-in-out infinite}.bob{animation:bob 1.1s ease-in-out infinite}.pulse-amber{animation:pulseAmber 2s infinite}.blink{animation:blink 1.2s infinite}
+`;
 
-  useEffect(() => {
-    if (!c.careerStarted) return;
-    c.syncShiftFromClock();
-  }, [gameHour, c.careerStarted]);
-
-  if (!c.careerStarted) {
-    return (
-      <div className="p-4 sm:p-8 max-w-md mx-auto">
-        <h1 className="text-2xl font-bold mb-2">Perona yazıl</h1>
-        <p className="text-sm text-zinc-500 mb-4 leading-relaxed">
-          Çırakken <strong className="text-zinc-300">sefer düzenleyemezsin</strong>.
-          Yardım et, olaylara karış, birik, sonra kendi terminalin.
-        </p>
-        <label className="text-xs text-zinc-500">Ad</label>
-        <input
-          className="w-full mb-3 px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-700 text-sm"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Ahmet"
-        />
-        <label className="text-xs text-zinc-500">Memleket</label>
-        <select
-          className="w-full mb-4 px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-700 text-sm"
-          value={mem}
-          onChange={(e) => setMem(e.target.value)}
-        >
-          {MEMLEKET_HITAP.map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          onClick={() => c.startCareer(name, mem)}
-          className="w-full py-3 rounded-xl font-bold text-sm text-black bg-amber-500"
-        >
-          Vardiyaya başla
-        </button>
-      </div>
-    );
-  }
-
-  if (c.careerDone) {
-    return (
-      <div className="p-8 max-w-md mx-auto text-center">
-        <h1 className="text-xl font-bold text-emerald-400">Bağımsız esnaf</h1>
-        <p className="text-sm text-zinc-400 mt-3">
-          Peron seni tanıdı. Birikim: {c.savings} ₺ — kasaya aktarılacak.
-        </p>
-        <Link
-          href="/setup"
-          className="inline-block mt-6 px-6 py-3 rounded-xl bg-amber-500 text-black font-bold text-sm"
-        >
-          Kendi terminalini kur
-        </Link>
-        <Link href="/dashboard" className="block mt-3 text-xs text-zinc-500">
-          Panel
-        </Link>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-4 sm:p-8 max-w-lg mx-auto pb-24">
-      <div className="mb-3 p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-[11px] text-zinc-500 leading-relaxed">
-        <strong className="text-amber-500/90">Çırak modu:</strong> Sefer / garaj /
-        pazar kilitli. Görev + ani olay (kavga, kapı, yolcu). Hedef: rütbe veya
-        ~12.000 ₺ birikim → istifa / bağımsız → terminal.
-      </div>
-
-      <div className="flex flex-wrap justify-between gap-2 mb-4">
-        <div>
-          <h1 className="text-xl font-bold">{c.displayHitap}</h1>
-          <p className="text-xs text-zinc-500">
-            {c.companyName} · {c.workCity} · {RANK_LABEL[c.rank]}
-          </p>
-          <p className="text-xs text-amber-500/90 mt-1">
-            {c.shiftLabelText} · {String(gameHour).padStart(2, "0")}:00 · yorgun %
-            {Math.round(c.fatigue)}
-          </p>
-        </div>
-        <div className="flex flex-col gap-1">
-          <button
-            type="button"
-            onClick={() => c.rollShiftTasks()}
-            className="text-xs px-3 py-1.5 rounded-lg border border-zinc-600"
-          >
-            Vardiya yenile
-          </button>
-          <button
-            type="button"
-            onClick={() => c.rest?.()}
-            className="text-xs px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-400"
-          >
-            Dinlen
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-2 mb-4 text-center text-xs">
-        <div className="bg-zinc-900 rounded-lg p-2 border border-zinc-800">
-          <div className="text-zinc-500">Güven</div>
-          <div className="text-lg font-bold text-cyan-400">{c.trust}</div>
-        </div>
-        <div className="bg-zinc-900 rounded-lg p-2 border border-zinc-800">
-          <div className="text-zinc-500">Tanınırlık</div>
-          <div className="text-lg font-bold text-amber-400">{c.fame}</div>
-        </div>
-        <div className="bg-zinc-900 rounded-lg p-2 border border-zinc-800">
-          <div className="text-zinc-500">Birikim</div>
-          <div className="text-lg font-bold text-emerald-400">{c.savings} ₺</div>
-        </div>
-      </div>
-
-      {/* ANİ OLAY */}
-      {c.drama && (
-        <div className="mb-4 p-4 rounded-2xl border-2 border-red-800 bg-red-950/40">
-          <div className="text-[10px] font-bold text-red-400 tracking-widest">
-            ANİ OLAY · {c.drama.kind.toUpperCase()}
-          </div>
-          <div className="font-bold text-sm mt-1">{c.drama.title}</div>
-          <p className="text-sm text-zinc-300 mt-2 leading-relaxed">
-            {c.drama.body}
-          </p>
-          <div className="mt-3 flex flex-col gap-2">
-            {c.drama.choices.map((ch) => (
-              <button
-                key={ch.id}
-                type="button"
-                onClick={() => c.resolveDrama(ch.id)}
-                className="text-left px-3 py-2.5 rounded-lg border border-red-900/60 bg-zinc-950 text-sm hover:border-red-500"
-              >
-                {ch.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {c.patronCalling && (
-        <div className="mb-4 p-4 rounded-xl border-2 border-amber-600 bg-amber-950/40">
-          <div className="text-xs font-bold text-amber-400">PATRON ÇAĞIRDI</div>
-          <p className="text-sm mt-1">{c.patronName} yazıhanede.</p>
-          <div className="flex gap-2 mt-3">
-            <button
-              type="button"
-              onClick={() => c.answerPatronCall()}
-              className="flex-1 py-2 rounded-lg bg-amber-500 text-black text-sm font-semibold"
-            >
-              Yanına git
-            </button>
-            <button
-              type="button"
-              onClick={() => c.ignorePatronCall()}
-              className="px-3 py-2 rounded-lg border border-zinc-600 text-xs"
-            >
-              Yok say
-            </button>
-          </div>
-        </div>
-      )}
-
-      {c.jobOffer && (
-        <div className="mb-4 p-4 rounded-xl border border-cyan-800 bg-zinc-900">
-          <div className="text-xs text-cyan-400 font-bold">İŞ TEKLİFİ</div>
-          <div className="font-semibold mt-1">{c.jobOffer.company}</div>
-          <p className="text-sm text-zinc-400 mt-1">{c.jobOffer.body}</p>
-          <div className="flex gap-2 mt-3">
-            <button
-              type="button"
-              onClick={() => c.acceptJobOffer()}
-              className="flex-1 py-2 rounded-lg bg-cyan-600 text-sm font-semibold"
-            >
-              Kabul
-            </button>
-            <button
-              type="button"
-              onClick={() => c.refuseJobOffer()}
-              className="px-3 py-2 text-xs border border-zinc-600 rounded-lg"
-            >
-              Red
-            </button>
-          </div>
-        </div>
-      )}
-
-      {c.mafiaWhisper && (
-        <div className="mb-4 p-3 rounded-lg bg-red-950/50 border border-red-900 text-xs text-red-200">
-          📰 {c.mafiaWhisper}
-          <button type="button" className="block mt-1 text-zinc-500" onClick={() => c.clearOutcome()}>
-            kapat
-          </button>
-        </div>
-      )}
-
-      {c.lastOutcome && !c.drama && (
-        <div className="mb-4 p-4 rounded-xl bg-zinc-900 border border-zinc-700 text-sm">
-          {c.lastOutcome}
-          <button type="button" onClick={() => c.clearOutcome()} className="block mt-2 text-xs text-zinc-500">
-            Tamam
-          </button>
-        </div>
-      )}
-
-      {!c.drama && c.activeTask ? (
-        <div className="bg-zinc-900 border border-amber-900/40 rounded-2xl p-5 mb-4">
-          <div className="text-[10px] tracking-widest text-amber-500 font-bold">
-            {c.activeTask.from.toUpperCase()} · {c.activeTask.speakerName}
-          </div>
-          <p className="text-sm mt-2 leading-relaxed">“{c.activeTask.prompt}”</p>
-          <div className="mt-4 flex flex-col gap-2">
-            {c.activeTask.options.map((o) => (
-              <button
-                key={o.id}
-                type="button"
-                onClick={() => c.resolveOption(o)}
-                className="w-full text-left px-3 py-2.5 rounded-lg border border-zinc-700 text-sm hover:border-amber-600"
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : !c.drama ? (
-        <div className="space-y-2 mb-6">
-          <h2 className="text-xs font-bold text-zinc-500 tracking-widest">GÖREVLER</h2>
-          {c.tasks.length === 0 && (
-            <p className="text-xs text-zinc-600">Liste boş — vardiyayı yenile.</p>
-          )}
-          {c.tasks.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => c.openTask(t.id)}
-              className="w-full text-left p-3 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600"
-            >
-              <div className="text-[10px] text-zinc-500">
-                {t.speakerName} · {t.kind}
-              </div>
-              <div className="text-sm mt-0.5 line-clamp-2">{t.prompt}</div>
-            </button>
-          ))}
-        </div>
-      ) : null}
-
-      <div className="flex flex-wrap gap-2 text-xs">
-        <button
-          type="button"
-          onClick={() => {
-            if (confirm("İstifa? (yeterli birikim/rütbe gerekir)")) c.resign();
-          }}
-          className="px-3 py-2 border border-red-900 text-red-400 rounded-lg"
-        >
-          İstifa / kendi işim
-        </button>
-      </div>
-
-      <ul className="mt-6 text-[11px] text-zinc-500 space-y-1 max-h-32 overflow-y-auto">
-        {c.log.map((l, i) => (
-          <li key={i}>{l}</li>
-        ))}
-      </ul>
-    </div>
-  );
+export default function ShiftPage(){
+ const gameHour=useGameStore(s=>s.gameHour); const c=useCareerStore();
+ const [name,setName]=useState(""); const [mem,setMem]=useState(MEMLEKET_HITAP[0]||"Keşanlı");
+ const [intro,setIntro]=useState(true); const [toast,setToast]=useState("");
+ useEffect(()=>{if(c.careerStarted)c.syncShiftFromClock()},[gameHour,c.careerStarted]);
+ const time=useMemo(()=>`${String(gameHour).padStart(2,"0")}:00`,[gameHour]);
+ const notify=(s:string)=>{setToast(s);window.setTimeout(()=>setToast(""),1800)};
+ if(intro)return <><style>{css}</style><main className="min-h-screen overflow-hidden bg-[#080705] text-zinc-100 relative flex items-center justify-center px-5"><div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(245,158,11,.13),transparent_45%)]"/><div className="absolute top-0 left-0 right-0 h-1 bg-amber-500"/><div className="absolute inset-x-0 bottom-0 h-32 bg-[linear-gradient(transparent,#15100a)]"/><div className="bus absolute bottom-24 left-0 text-6xl opacity-20">🚌</div><div className="scene-in relative z-10 max-w-3xl text-center"><div className="text-[10px] tracking-[.45em] text-amber-500 font-bold mb-5">NEXORA LABS PRESENTS</div><div className="text-xs tracking-[.35em] text-zinc-500 mb-3">İSTANBUL · 1987</div><h1 className="text-5xl sm:text-7xl font-black tracking-tight">PERON <span className="text-amber-500">SAVAŞLARI</span></h1><p className="mt-5 text-sm sm:text-base text-zinc-400 max-w-xl mx-auto leading-relaxed">Otogarın kalabalığına karış. Çıraklıktan başla, güven kazan, para biriktir ve kendi yazıhaneni kur.</p><button onClick={()=>setIntro(false)} className="pulse-amber mt-9 px-8 py-4 rounded-xl bg-amber-500 text-black font-black tracking-wide hover:bg-amber-400 transition">OTOGARA GİR →</button><div className="mt-8 text-[10px] text-zinc-600">4 DAKİKA = 1 OYUN GÜNÜ · TEK KİŞİLİK YÖNETİM SİMÜLASYONU</div></div></main></>;
+ if(!c.careerStarted)return <><style>{css}</style><main className="min-h-screen bg-[#080705] text-zinc-100 flex items-center justify-center p-5"><div className="w-full max-w-md scene-in"><div className="mb-7"><div className="text-[10px] tracking-[.35em] text-amber-500 font-bold">İLK VARDİYA</div><h1 className="text-3xl font-black mt-2">Otogara adım at.</h1><p className="text-sm text-zinc-500 mt-2">1987. Sabah vardiyası. Henüz kimse seni tanımıyor.</p></div><div className="rounded-2xl border border-zinc-800 bg-zinc-950/80 p-5 shadow-2xl"><label className="text-xs text-zinc-500">Adın</label><input autoFocus value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&name.trim())c.startCareer(name,mem)}} placeholder="Ahmet" className="mt-2 mb-4 w-full px-4 py-3 rounded-xl bg-zinc-900 border border-zinc-800 outline-none focus:border-amber-500"/><label className="text-xs text-zinc-500">Memleket</label><select value={mem} onChange={e=>setMem(e.target.value)} className="mt-2 mb-5 w-full px-4 py-3 rounded-xl bg-zinc-900 border border-zinc-800">{MEMLEKET_HITAP.map(m=><option key={m}>{m}</option>)}</select><button disabled={!name.trim()} onClick={()=>c.startCareer(name,mem)} className="w-full py-3.5 rounded-xl bg-amber-500 text-black font-black disabled:opacity-40">ÇIRAK OLARAK BAŞLA</button></div></div></main></>;
+ if(c.careerDone)return <main className="min-h-screen bg-[#080705] text-zinc-100 flex items-center justify-center p-5"><div className="text-center max-w-md scene-in"><div className="text-5xl">🏁</div><h1 className="text-3xl font-black text-emerald-400 mt-4">Bağımsız esnaf</h1><p className="text-zinc-400 mt-3">Peron seni tanıdı. Birikim: {c.savings} ₺</p><Link href="/setup" className="inline-block mt-7 px-6 py-3 rounded-xl bg-amber-500 text-black font-bold">Kendi terminalini kur</Link><Link href="/dashboard" className="block mt-4 text-xs text-zinc-500">Panele dön</Link></div></main>;
+ return <><style>{css}</style><main className="min-h-screen bg-[#080705] text-zinc-100 overflow-hidden"><header className="sticky top-0 z-30 border-b border-zinc-800 bg-[#0a0907]/95 backdrop-blur px-4 py-3"><div className="max-w-5xl mx-auto flex items-center justify-between"><div><div className="text-[9px] tracking-[.3em] text-amber-500 font-black">ESENLER OTOGARI</div><div className="font-black">{c.displayHitap}</div></div><div className="text-right"><div className="text-lg font-black text-amber-400">{time}</div><div className="text-[9px] text-zinc-600">1987 · {c.shiftLabelText}</div></div></div></header><div className="relative h-52 border-b border-zinc-800 overflow-hidden bg-[linear-gradient(#21170d,#0d0b08)]"><div className="absolute inset-x-0 bottom-10 h-px bg-amber-500/20"/><div className="bus absolute bottom-14 left-0 text-6xl">🚌</div><div className="absolute bottom-5 left-[12%] text-2xl walk">🧍</div><div className="absolute bottom-6 left-[42%] text-xl walk" style={{animationDelay:".2s"}}>🧍</div><div className="absolute bottom-5 left-[72%] text-2xl walk" style={{animationDelay:".4s"}}>🧍</div><div className="absolute left-4 bottom-20 text-[9px] tracking-widest text-zinc-600">PERON 7</div><div className="absolute right-4 top-5 text-right text-[9px] text-zinc-500">YAZIHANE · ÇAY OCAĞI · BAVUL</div><div className="absolute left-1/2 -translate-x-1/2 bottom-8 bob text-3xl">🧑‍💼</div></div><div className="max-w-5xl mx-auto px-4 py-5 pb-28"><div className="grid grid-cols-3 gap-2 mb-4"><Stat label="GÜVEN" value={c.trust} tone="text-cyan-400"/><Stat label="TANINIRLIK" value={c.fame} tone="text-amber-400"/><Stat label="BİRİKİM" value={`${c.savings} ₺`} tone="text-emerald-400"/></div>{c.patronCalling&&<Event title="PATRON ÇAĞIRIYOR" icon="📣" tone="amber"><p>{c.patronName} yazıhanede. Seni bekliyor.</p><div className="flex gap-2 mt-3"><button onClick={()=>{c.answerPatronCall();notify("Patronun yanına gittin.")}} className="flex-1 py-2 rounded-lg bg-amber-500 text-black font-bold">Koş →</button><button onClick={()=>c.ignorePatronCall()} className="px-4 py-2 rounded-lg border border-zinc-700">Sonra</button></div></Event>}{c.drama&&<Event title={`ANİ OLAY · ${c.drama.kind.toUpperCase()}`} icon="⚡" tone="red"><p className="font-semibold">{c.drama.title}</p><p className="text-zinc-400 mt-1">{c.drama.body}</p><div className="grid gap-2 mt-3">{c.drama.choices.map(ch=><button key={ch.id} onClick={()=>{c.resolveDrama(ch.id);notify("Kararın uygulandı.")}} className="text-left px-3 py-3 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-amber-500 transition">→ {ch.label}</button>)}</div></Event>}{c.jobOffer&&<Event title="İŞ TEKLİFİ" icon="💼" tone="cyan"><p className="font-semibold">{c.jobOffer.company}</p><p className="text-zinc-400 mt-1">{c.jobOffer.body}</p><div className="flex gap-2 mt-3"><button onClick={()=>c.acceptJobOffer()} className="flex-1 py-2 rounded-lg bg-cyan-600 font-bold">Kabul</button><button onClick={()=>c.refuseJobOffer()} className="px-4 py-2 rounded-lg border border-zinc-700">Red</button></div></Event>}{!c.drama&&c.activeTask?<section className="scene-in rounded-2xl border border-amber-900/50 bg-[#12100c] p-5 mb-4"><div className="flex items-center gap-2 text-[10px] tracking-widest text-amber-500 font-black"><span className="text-lg bob">☕</span>{c.activeTask.from.toUpperCase()} · {c.activeTask.speakerName}</div><p className="text-lg font-semibold mt-3 leading-relaxed">“{c.activeTask.prompt}”</p><div className="mt-5 grid gap-2">{c.activeTask.options.map((o,i)=><button key={o.id} onClick={()=>{c.resolveOption(o);notify(i===0?"Seçimin uygulandı.":"Karar kayda geçti.")}} className="group text-left px-4 py-3 rounded-xl border border-zinc-800 bg-zinc-950 hover:border-amber-500 hover:-translate-y-0.5 transition-all"><span className="inline-flex w-7 h-7 rounded-full bg-zinc-900 items-center justify-center mr-2 text-amber-500 group-hover:bg-amber-500 group-hover:text-black">{i+1}</span>{o.label}</button>)}</div></section>:!c.drama&&<section className="scene-in mb-5"><div className="flex items-center justify-between mb-2"><h2 className="text-[10px] tracking-[.3em] text-zinc-500 font-black">VARDİYA GÖREVLERİ</h2><button onClick={()=>{c.rollShiftTasks();notify("Yeni görevler geldi.")}} className="text-[10px] text-amber-500">YENİLE ↻</button></div><div className="grid gap-2">{c.tasks.map((t,i)=><button key={t.id} onClick={()=>c.openTask(t.id)} className="group text-left p-4 rounded-xl border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-900 hover:border-amber-700 transition"><div className="flex items-center gap-3"><span className="text-2xl group-hover:scale-110 transition-transform">{i%3===0?"☕":i%3===1?"📰":"🧳"}</span><span className="min-w-0"><span className="block text-[9px] text-zinc-600">{t.speakerName} · {t.kind}</span><span className="block text-sm mt-1 line-clamp-2">{t.prompt}</span></span><span className="ml-auto text-zinc-700">›</span></div></button>)}</div></section>}<div className="flex gap-2"><button onClick={()=>c.rest?.()} className="px-4 py-2 rounded-lg border border-zinc-800 text-xs text-zinc-400">☕ Dinlen</button><button onClick={()=>{if(confirm("İstifa etmek istiyor musun?"))c.resign()}} className="px-4 py-2 rounded-lg border border-red-950 text-xs text-red-400">İstifa</button></div><div className="mt-6 rounded-xl border border-zinc-900 bg-black/20 p-3"><div className="text-[9px] tracking-widest text-zinc-700 mb-2">VARDİYA GÜNLÜĞÜ</div>{c.log.slice(0,7).map((l,i)=><div key={i} className="text-[10px] text-zinc-600 py-1 border-b border-zinc-900 last:border-0">{l}</div>)}</div></div>{toast&&<div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 scene-in px-5 py-3 rounded-xl bg-amber-500 text-black text-xs font-black shadow-2xl">✓ {toast}</div>}</main></>;
 }
+function Stat({label,value,tone}:{label:string,value:string|number,tone:string}){return <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-3 text-center"><div className="text-[9px] text-zinc-600 tracking-wider">{label}</div><div className={`text-lg font-black ${tone}`}>{value}</div></div>}
+function Event({title,icon,tone,children}:{title:string,icon:string,tone:"amber"|"red"|"cyan",children:React.ReactNode}){const border=tone==="amber"?"border-amber-900/60":tone==="red"?"border-red-900/60":"border-cyan-900/60";return <section className={`scene-in mb-4 rounded-2xl border ${border} bg-zinc-950/80 p-4`}><div className="flex items-center gap-2 text-xs font-black tracking-widest"><span className="text-xl bob">{icon}</span>{title}</div><div className="text-sm text-zinc-300 mt-2">{children}</div></section>}
