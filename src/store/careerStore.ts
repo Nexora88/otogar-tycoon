@@ -76,6 +76,19 @@ export function levelTitle(level: number) {
   return "Peron Çırağı";
 }
 
+export function levelCelebration(level: number, title: string) {
+  const messages: Record<number, string> = {
+    2: "Peronda adın duyulmaya başladı.",
+    3: "Usta esnaf kapısı açıldı. Artık sadece çırak değilsin.",
+    6: "İlk büyük eşik: kendi firmanı büyütecek seviyedesin.",
+    10: "Bölge patronu. Harita artık senin için küçülüyor.",
+    15: "Ulusal patron. Türkiye ağı için yeni dönem başladı.",
+    20: "Holding patronu. Artık tek bir otobüs şirketinden fazlasısın.",
+    25: "Otogar efsanesi. Bir dönemi sen yazdın.",
+  };
+  return messages[level] || `${title} seviyesine ulaştın. Dünya seninle birlikte değişiyor.`;
+}
+
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]!;
 }
@@ -183,7 +196,15 @@ export interface CareerState {
   background: string;
   ambition: string;
   levelTitle: string;
+  levelUpNotice: { level: number; title: string; message: string } | null;
+  crimeRecord: number;
+  internationalOffer: { country: string; route: string; reward: number; risk: number } | null;
+  internationalTerminals: string[];
   addXp: (amount: number) => void;
+  buildInternationalTerminal: (country: string, levelNeed: number) => boolean;
+  acceptInternationalOffer: () => void;
+  refuseInternationalOffer: () => void;
+  clearLevelUpNotice: () => void;
 
   canFoundTerminal: () => boolean;
   startCareer: (name: string, memleket: string, background?: string, ambition?: string) => void;
@@ -245,6 +266,16 @@ export const useCareerStore = create<CareerState>()(
       licenseNote: LICENSE_LINES.yok,
       daysWithoutCaught: 0,
       caughtCount: 0,
+      level: 1,
+      xp: 0,
+      hometown: "",
+      background: "esnaf",
+      ambition: "kendi_firma",
+      levelTitle: levelTitle(1),
+      levelUpNotice: null,
+      crimeRecord: 0,
+      internationalOffer: null,
+      internationalTerminals: [],
 
       canFoundTerminal: () => {
         const s = get();
@@ -267,10 +298,80 @@ export const useCareerStore = create<CareerState>()(
           while (xp >= xpForLevel(level) && level < 25) { xp -= xpForLevel(level); level += 1; }
           return { xp, level, levelTitle: levelTitle(level) };
         });
-        if (get().level > before) {
-          get().pushLog(`SEVİYE ATLANDI → ${get().level} · ${get().levelTitle}`);
-          try { useGameStore.getState().pushPhone(`Seviye ${get().level}`, `Yeni unvan: ${get().levelTitle}`); } catch {}
+        const after = get().level;
+        if (after > before) {
+          const title = get().levelTitle;
+          const message = levelCelebration(after, title);
+          set({ levelUpNotice: { level: after, title, message } });
+          get().pushLog(`SEVİYE ATLANDI → ${after} · ${title}`);
+          try { useGameStore.getState().pushPhone(`LEVEL ${after} · ${title}`, message); } catch {}
+          if (after >= 10 && !get().internationalOffer) {
+            const offers = [
+              { country: "Bulgaristan", route: "İstanbul → Sofya", reward: 18000, risk: 0.24 },
+              { country: "Yunanistan", route: "İstanbul → Selanik", reward: 22000, risk: 0.28 },
+              { country: "Romanya", route: "İstanbul → Bükreş", reward: 26000, risk: 0.32 },
+              { country: "Gürcistan", route: "İstanbul → Batum", reward: 30000, risk: 0.36 },
+            ];
+            set({ internationalOffer: pick(offers) });
+            get().pushLog("Sınır ötesi teklif geldi — karar zamanı.");
+          }
         }
+      },
+
+      clearLevelUpNotice: () => set({ levelUpNotice: null }),
+
+      buildInternationalTerminal: (country, levelNeed) => {
+        const s = get();
+        if (s.level < levelNeed || s.internationalTerminals.includes(country)) return false;
+        const cost = 120000 + levelNeed * 15000;
+        if (!useGameStore.getState().spendMoney(cost)) return false;
+        set((st) => ({
+          internationalTerminals: [...st.internationalTerminals, country],
+          lastOutcome: country + " terminal yatırımı tamamlandı. Yeni ülke ağına giriş yaptın.",
+          log: ["ULUSLARARASI TERMİNAL → " + country + " · -" + cost.toLocaleString("tr-TR") + " ₺", ...st.log].slice(0, 60),
+        }));
+        get().addXp(80);
+        try { useGameStore.getState().pushPhone("Yeni terminal", country + " terminali açıldı. Uluslararası ağ büyüyor."); } catch {}
+        return true;
+      },
+
+      acceptInternationalOffer: () => {
+        const offer = get().internationalOffer;
+        if (!offer) return;
+        const caught = Math.random() < offer.risk;
+        if (caught) {
+          const penalty = Math.max(12000, Math.round(offer.reward * 2.8));
+          set((s) => ({
+            internationalOffer: null,
+            crimeRecord: s.crimeRecord + 1,
+            savings: Math.max(0, s.savings - penalty),
+            trust: clamp(s.trust - 20, 0, 100),
+            fame: clamp(s.fame - 12, 0, 100),
+            caughtCount: s.caughtCount + 1,
+            daysWithoutCaught: 0,
+            licenseStatus: s.licenseStatus === "onayli" ? "iptal_riski" : s.licenseStatus,
+            licenseNote: s.licenseStatus === "onayli" ? LICENSE_LINES.iptal_riski : s.licenseNote,
+            lastOutcome: `SINIRDA YAKALANDIN. Kaçak yolcu taşıma suçu kayda geçti. ${penalty.toLocaleString("tr-TR")} ₺ ceza, ağır sicil kaybı ve ruhsat riski.`,
+            log: [`[SUÇ] Sınır ötesi kaçak yolcu teklifi → YAKALANDI · -${penalty} ₺`, ...s.log].slice(0, 60),
+          }));
+          try { useGameStore.getState().pushPhone("AĞIR CEZA", `Sınır ötesi kaçak yolcu operasyonu yakalandı. ${penalty.toLocaleString("tr-TR")} ₺ ceza ve sicil kaydı.`); } catch {}
+          return;
+        }
+        set((s) => ({
+          internationalOffer: null,
+          savings: s.savings + offer.reward,
+          fame: clamp(s.fame + 2, 0, 100),
+          lastOutcome: `${offer.country} hattından döndün. Para geldi; ama yaptığın iş hâlâ yasa dışı ve sicil riski taşıyor.`,
+          log: [`[SUÇ] ${offer.route} → başarılı kaçak sefer · +${offer.reward} ₺`, ...s.log].slice(0, 60),
+        }));
+        try { useGameStore.getState().pushPhone("Sınır hattı", `+${offer.reward.toLocaleString("tr-TR")} ₺. Riskli teklif tamamlandı.`); } catch {}
+      },
+
+      refuseInternationalOffer: () => {
+        const offer = get().internationalOffer;
+        if (!offer) return;
+        set({ internationalOffer: null, lastOutcome: "Teklifi reddettin. Temiz sicil, daha yavaş büyüme.", });
+        get().pushLog("Sınır ötesi kaçak yolcu teklifi reddedildi.");
       },
 
       startCareer: (name, memleket, background = "esnaf", ambition = "kendi_firma") => {
@@ -305,6 +406,17 @@ export const useCareerStore = create<CareerState>()(
         let abi2 = randomAbiName();
         if (abi2 === abi) abi2 = randomAbiName();
 
+        const originBonus =
+          background === "esnaf" ? { trust: 6, savings: 250 } :
+          background === "otogar" ? { trust: 4, savings: 150 } :
+          background === "mekanik" ? { trust: 2, savings: 350 } :
+          { trust: 3, savings: 500 };
+        const ambitionBonus =
+          ambition === "ulusal" ? { fame: 2 } :
+          ambition === "zengin" ? { savings: 700 } :
+          ambition === "saygin" ? { trust: 3 } :
+          { fame: 1 };
+
         set({
           careerStarted: true,
           careerDone: false,
@@ -317,9 +429,9 @@ export const useCareerStore = create<CareerState>()(
           abi2Name: abi2,
           workCity,
           rank: "cirak",
-          trust: 12,
-          fame: 0,
-          savings: 500,
+          trust: 12 + originBonus.trust + ambitionBonus.trust,
+          fame: ambitionBonus.fame,
+          savings: 500 + originBonus.savings + ambitionBonus.savings,
           fatigue: 0,
           tasksDone: 0,
           shiftsDone: 0,
@@ -337,6 +449,9 @@ export const useCareerStore = create<CareerState>()(
           caughtCount: 0,
           level: 1,
           xp: 0,
+          levelUpNotice: null,
+          crimeRecord: 0,
+          internationalOffer: null,
           hometown: mem,
           background,
           ambition,
@@ -797,6 +912,10 @@ export const useCareerStore = create<CareerState>()(
         background: s.background,
         ambition: s.ambition,
         levelTitle: s.levelTitle,
+        levelUpNotice: null,
+        crimeRecord: s.crimeRecord,
+        internationalOffer: s.internationalOffer,
+        internationalTerminals: s.internationalTerminals,
         shiftsDone: s.shiftsDone,
         lastTaskDay: s.lastTaskDay,
         licenseStatus: s.licenseStatus,

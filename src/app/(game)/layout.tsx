@@ -13,6 +13,8 @@ import MeetingModal from "@/components/MeetingModal";
 import TicketReceipt from "@/components/TicketReceipt";
 import InspectorModal from "@/components/InspectorModal";
 import EcosystemAds from "@/components/EcosystemAds";
+import LevelCelebration from "@/components/LevelCelebration";
+import InternationalOfferModal from "@/components/InternationalOfferModal";
 
 const NAV: {
   href: string;
@@ -31,6 +33,7 @@ const NAV: {
   { href: "/upgrades", label: "Yatırım", needBoss: true },
   { href: "/rivals", label: "Rakipler", needBoss: true },
   { href: "/capital", label: "Sermaye", needBoss: true },
+  { href: "/international", label: "Uluslararası", needBoss: true },
   { href: "/story", label: "Hikâye" },
   { href: "/kulis", label: "Kulis" },
   { href: "/events", label: "Etkinlik" },
@@ -65,6 +68,7 @@ export default function GameLayout({
   const calendarTitle = useGameStore((s) => s.calendarTitle);
   const fuelPrice = useGameStore((s) => s.fuelPrice);
   const inspector = useGameStore((s) => s.inspector);
+  const crimeRecord = useCareerStore((s) => s.crimeRecord);
 
   const careerStarted = useCareerStore((s) => s.careerStarted);
   const careerDone = useCareerStore((s) => s.careerDone);
@@ -181,6 +185,11 @@ export default function GameLayout({
                   Kapı
                 </span>
               )}
+              {crimeRecord > 0 && (
+                <span className="text-[10px] px-2 py-1 rounded bg-red-950/60 text-red-300 border border-red-900">
+                  Sicil {crimeRecord}
+                </span>
+              )}
               {inspector && (
                 <span className="text-[10px] px-2 py-1 rounded bg-amber-950 text-amber-200 border border-amber-800">
                   Müfettiş
@@ -254,6 +263,8 @@ export default function GameLayout({
       <MeetingModal />
       <TicketReceipt />
       <InspectorModal />
+      <LevelCelebration />
+      <InternationalOfferModal />
     </div>
   );
 }
