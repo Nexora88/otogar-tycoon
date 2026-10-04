@@ -200,6 +200,19 @@ export interface InspectorVisit {
   bribe: number;
 }
 
+export interface RivalCompany {
+  id: string;
+  name: string;
+  style: "fiyatçı" | "konforcu" | "yayılmacı" | "disiplinli";
+  cash: number;
+  reputation: number;
+  fleet: number;
+  routes: string[];
+  ticketIndex: number;
+  active: boolean;
+  lastActionDay: number;
+}
+
 export interface OfflineReport {
   minutesAway: number;
   gameDays: number;
@@ -278,6 +291,7 @@ export interface GameState {
   serviceUpgradeLevel: number;
   restStopDealLevel: number;
   offlineReport: OfflineReport | null;
+  rivals: RivalCompany[];
 
   startAsGuest: () => void;
   setCompanyName: (n: string) => void;
@@ -358,6 +372,7 @@ export interface GameState {
   signRestStopDeal: () => boolean;
   clearOfflineReport: () => void;
   processOfflineProgress: (fromMs: number, toMs: number) => void;
+  advanceRivals: (days: number) => void;
 }
 
 // ═══════════════════════════════════════════
@@ -618,6 +633,13 @@ const PASSENGER_NAMES = [
   "Rıza Efendi",
   "Hatice Nine",
   "Kemal Bey",
+];
+
+export const RIVAL_POOL: RivalCompany[] = [
+  { id: "mavi-yol", name: "Mavi Yol Turizm", style: "fiyatçı", cash: 180000, reputation: 58, fleet: 6, routes: ["İstanbul → Ankara", "İstanbul → Bursa"], ticketIndex: 0.92, active: true, lastActionDay: 0 },
+  { id: "anadolu-star", name: "Anadolu Star", style: "konforcu", cash: 260000, reputation: 72, fleet: 8, routes: ["Ankara → İzmir", "İstanbul → İzmir"], ticketIndex: 1.08, active: true, lastActionDay: 0 },
+  { id: "ufuk", name: "Ufuk Seyahat", style: "yayılmacı", cash: 120000, reputation: 49, fleet: 5, routes: ["İstanbul → Edirne", "İzmir → Antalya"], ticketIndex: 0.99, active: true, lastActionDay: 0 },
+  { id: "kervan", name: "Kervan Otobüs", style: "disiplinli", cash: 340000, reputation: 66, fleet: 10, routes: ["İstanbul → Ankara", "Ankara → Konya"], ticketIndex: 1.02, active: true, lastActionDay: 0 },
 ];
 
 export function generatePassengers(n: number): Passenger[] {
@@ -960,6 +982,7 @@ function createInitialState() {
     serviceUpgradeLevel: 0,
     restStopDealLevel: 0,
     offlineReport: null as OfflineReport | null,
+    rivals: RIVAL_POOL.map((r) => ({ ...r })),
   };
 }
 
@@ -1132,6 +1155,7 @@ export const useGameStore = create<GameState>()(
 
         if (clock.gameDay !== prevD) {
           const elapsedGameDays = Math.min(30, Math.max(1, clock.totalDays - previousClock.totalDays));
+          get().advanceRivals(elapsedGameDays);
           const dailyWages = get().drivers.reduce((sum, d) => sum + d.wage, 0) * elapsedGameDays;
           const dailyTerminal = (get().terminalSlots || []).reduce((sum, slot) => sum + (SLOT_INFO[slot]?.cps || 0) * 20, 0) * elapsedGameDays;
           if (dailyWages > 0 || dailyTerminal > 0) {
@@ -1278,6 +1302,40 @@ export const useGameStore = create<GameState>()(
           get().calendarMood
         );
         set({ morningPaper: morning, newspaper: morning });
+      },
+
+      advanceRivals: (days) => {
+        const d = Math.max(1, Math.min(30, Math.floor(days)));
+        const today = get().gameDay;
+        const rivals = get().rivals.map((r) => {
+          if (!r.active) return r;
+          let cash = r.cash; let reputation = r.reputation; let fleet = r.fleet;
+          let ticketIndex = r.ticketIndex; let routes = [...r.routes];
+          for (let i = 0; i < d; i++) {
+            const demand = get().demandMultiplier * (0.9 + Math.random() * 0.25);
+            const margin = Math.max(0.55, 1.05 - ticketIndex * 0.18);
+            cash += Math.round(fleet * 1800 * demand * margin);
+            cash -= Math.round(fleet * (get().fuelPrice * 18 + 900));
+            reputation += Math.random() > 0.7 ? (Math.random() > 0.5 ? 1 : -1) : 0;
+            if (cash > 90000 && fleet < 18 && Math.random() > (r.style === "yayılmacı" ? 0.45 : 0.78)) { fleet += 1; cash -= 52000; }
+            if (r.style === "fiyatçı" && Math.random() > 0.55) ticketIndex = Math.max(0.78, ticketIndex - 0.015);
+            if (r.style === "konforcu" && Math.random() > 0.55) ticketIndex = Math.min(1.24, ticketIndex + 0.012);
+            if (r.style === "yayılmacı" && fleet >= routes.length + 4 && Math.random() > 0.7) {
+              const candidates = ["İstanbul → Antalya", "Ankara → Bursa", "İzmir → İstanbul", "Edirne → İstanbul"];
+              const next = candidates.find((x) => !routes.includes(x)); if (next) routes.push(next);
+            }
+            if (cash < -25000) return { ...r, cash: 0, reputation: Math.max(0, reputation - 10), fleet: Math.max(1, fleet - 1), routes, ticketIndex, active: false, lastActionDay: today + d };
+          }
+          return { ...r, cash: Math.max(0, cash), reputation: Math.max(0, Math.min(100, reputation)), fleet, routes, ticketIndex, lastActionDay: today + d };
+        });
+        set({ rivals });
+        const event = rivals.find((r) => r.active && r.lastActionDay === today + d);
+        if (event && Math.random() > 0.35) {
+          const headline = event.routes.length > 2 ? event.name + " yeni hatta çıktı" : event.name + " fiyat politikasını değiştirdi";
+          const body = event.routes.length > 2 ? event.name + ", " + event.routes[event.routes.length - 1] + " hattını ağına ekledi. Filo: " + event.fleet + "." : "Rakip şirket " + event.name + ", bilet endeksini " + event.ticketIndex.toFixed(2) + " seviyesine taşıdı.";
+          set((s) => ({ morningPaper: [news("rival-" + (today + d) + "-" + event.id, headline, body, { tag: "rival", day: today + d }), ...s.morningPaper].slice(0, 14) }));
+          get().pushPhone("Piyasa", body);
+        }
       },
 
       rollRoadEvent: (exp) => {

@@ -28,6 +28,7 @@ const NAV: {
   { href: "/market", label: "Pazar", needBoss: true },
   { href: "/staff", label: "Kadro", needBoss: true },
   { href: "/upgrades", label: "Yatırım", needBoss: true },
+  { href: "/rivals", label: "Rakipler", needBoss: true },
   { href: "/story", label: "Hikâye" },
   { href: "/kulis", label: "Kulis" },
   { href: "/events", label: "Etkinlik" },
