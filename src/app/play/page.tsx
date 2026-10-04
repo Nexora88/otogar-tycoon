@@ -28,7 +28,7 @@ export default function PlayPage() {
     }
 
     if (!c.careerStarted) {
-      router.replace("/shift");
+      router.replace("/opening");
       return;
     }
 

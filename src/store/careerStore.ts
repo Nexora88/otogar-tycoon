@@ -65,6 +65,17 @@ function clamp(n: number, a: number, b: number) {
   return Math.max(a, Math.min(b, n));
 }
 
+export function xpForLevel(level: number) { return 100 + (level - 1) * 75; }
+export function levelTitle(level: number) {
+  if (level >= 25) return "Otogar Efsanesi";
+  if (level >= 20) return "Holding Patronu";
+  if (level >= 15) return "Ulusal Patron";
+  if (level >= 10) return "Bölge Patronu";
+  if (level >= 6) return "Firma Sahibi";
+  if (level >= 3) return "Usta Esnaf";
+  return "Peron Çırağı";
+}
+
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]!;
 }
@@ -166,9 +177,16 @@ export interface CareerState {
   licenseNote: string;
   daysWithoutCaught: number;
   caughtCount: number;
+  level: number;
+  xp: number;
+  hometown: string;
+  background: string;
+  ambition: string;
+  levelTitle: string;
+  addXp: (amount: number) => void;
 
   canFoundTerminal: () => boolean;
-  startCareer: (name: string, memleket: string) => void;
+  startCareer: (name: string, memleket: string, background?: string, ambition?: string) => void;
   syncShiftFromClock: () => void;
   rollShiftTasks: () => void;
   openTask: (id: string) => void;
@@ -240,7 +258,22 @@ export const useCareerStore = create<CareerState>()(
       pushLog: (line) =>
         set((s) => ({ log: [line, ...s.log].slice(0, 60) })),
 
-      startCareer: (name, memleket) => {
+      addXp: (amount) => {
+        if (amount <= 0) return;
+        const before = get().level;
+        set((s) => {
+          let xp = s.xp + amount;
+          let level = s.level;
+          while (xp >= xpForLevel(level) && level < 25) { xp -= xpForLevel(level); level += 1; }
+          return { xp, level, levelTitle: levelTitle(level) };
+        });
+        if (get().level > before) {
+          get().pushLog(`SEVİYE ATLANDI → ${get().level} · ${get().levelTitle}`);
+          try { useGameStore.getState().pushPhone(`Seviye ${get().level}`, `Yeni unvan: ${get().levelTitle}`); } catch {}
+        }
+      },
+
+      startCareer: (name, memleket, background = "esnaf", ambition = "kendi_firma") => {
         const n = name.trim().slice(0, 24) || "Çırak";
         const mem =
           memleket.trim() ||
@@ -302,6 +335,12 @@ export const useCareerStore = create<CareerState>()(
           licenseNote: LICENSE_LINES.yok,
           daysWithoutCaught: 0,
           caughtCount: 0,
+          level: 1,
+          xp: 0,
+          hometown: mem,
+          background,
+          ambition,
+          levelTitle: levelTitle(1),
           log: [
             `${workCity} · ${company}`,
             `Patron ${patron} · ${abi} / ${abi2}`,
@@ -445,6 +484,7 @@ export const useCareerStore = create<CareerState>()(
             100
           ),
           tasksDone: s.tasksDone + 1,
+          // Her iş, oyunun genel ilerleme seviyesine de katkı verir.
           tasks: s.tasks.filter((t) => t.id !== task.id),
           activeTask: null,
           lastOutcome: caught
@@ -466,6 +506,7 @@ export const useCareerStore = create<CareerState>()(
           );
         }
 
+        get().addXp(20 + Math.max(0, fameD * 5));
         get().tryPromote();
         if (Math.random() > 0.38) get().maybeRollDrama();
       },
@@ -750,6 +791,12 @@ export const useCareerStore = create<CareerState>()(
         savings: s.savings,
         fatigue: s.fatigue,
         tasksDone: s.tasksDone,
+        level: s.level,
+        xp: s.xp,
+        hometown: s.hometown,
+        background: s.background,
+        ambition: s.ambition,
+        levelTitle: s.levelTitle,
         shiftsDone: s.shiftsDone,
         lastTaskDay: s.lastTaskDay,
         licenseStatus: s.licenseStatus,

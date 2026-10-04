@@ -69,6 +69,10 @@ export default function GameLayout({
   const careerStarted = useCareerStore((s) => s.careerStarted);
   const careerDone = useCareerStore((s) => s.careerDone);
   const rank = useCareerStore((s) => s.rank);
+  const level = useCareerStore((s) => s.level);
+  const xp = useCareerStore((s) => s.xp);
+  const levelTitle = useCareerStore((s) => s.levelTitle);
+  const xpNeed = 100 + Math.max(0, level - 1) * 75;
 
   const isBoss = careerDone || setupDone || rank === "bagimsiz";
 
@@ -99,6 +103,16 @@ export default function GameLayout({
           <div className="text-[10px] text-zinc-500 mt-0.5">
             {gameYear || 1987} · Gün {gameDay} ·{" "}
             {String(gameHour).padStart(2, "0")}:00
+          </div>
+          <div className="mt-3 rounded-lg border border-amber-900/40 bg-amber-950/20 p-2">
+            <div className="flex items-center justify-between text-[9px]">
+              <span className="text-amber-400 font-black">LVL {level}</span>
+              <span className="text-zinc-500">{levelTitle}</span>
+            </div>
+            <div className="h-1 bg-zinc-900 rounded-full mt-1 overflow-hidden">
+              <div className="h-full bg-amber-500" style={{ width: Math.min(100, (xp / xpNeed) * 100) + "%" }} />
+            </div>
+            <div className="text-[8px] text-zinc-600 mt-1">{xp} / {xpNeed} XP</div>
           </div>
         </div>
         <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">

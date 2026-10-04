@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useCareerStore } from "@/store/careerStore";
 
 const scenes=[
 {image:"/story/esenler-morning.svg",year:"1987",place:"ESENLER OTOGARI",line:"Bazı hikâyeler bir otobüsle başlar.",sub:"Bazıları ise bir insanın ilk kez “ben de yapabilirim” demesiyle."},
@@ -8,27 +9,28 @@ const scenes=[
 {image:"/story/bursa-rain.svg",year:"1988",place:"İSTANBUL → BURSA",line:"İlk kararın para kazandırmayabilir.",sub:"Ama karakterini gösterir."},
 {image:"/story/boardroom.svg",year:"1991",place:"YÖNETİM MASASI",line:"Sonra mesele otobüs olmaktan çıkar.",sub:"İsim. Güven. Sermaye. Kontrol."}
 ];
+const cities=["Keşanlı","Edirneli","İstanbullu","Ankaralı","İzmirli","Bursalı","Samsunlu","Trabzonlu","Adanalı","Konyalı","Vanlı"];
+const backgrounds=[["esnaf","Esnaf ailesinden geliyorum","Para hesabını, müşteriyi ve sabrı küçük yaşta öğrendim."],["otogar","Otogarın içinden geliyorum","Peronu, kaptanları ve yazıhane dilini biliyorum."],["mekanik","Tamirhaneden geliyorum","Makineyi ve otobüsü insan kadar iyi tanıyorum."],["okul","Okuldan yeni çıktım","Defter, hesap ve öğrenme konusunda güçlüyüm."]];
+const ambitions=[["kendi_firma","Kendi firmamı kurmak","Bir gün kendi tabelamı asacağım."],["ulusal","Türkiye'nin her yerine gitmek","Tek bir perona bağlı kalmak istemiyorum."],["zengin","Büyük para kazanmak","Küçük başlayıp büyük sermaye kuracağım."],["saygin","İsim bırakmak","İnsanların güveneceği bir marka kuracağım."]];
 
 export default function OpeningPage(){
- const router=useRouter();const[index,setIndex]=useState(0);const[started,setStarted]=useState(false);const scene=scenes[index];
- useEffect(()=>{if(!started)return;const t=setTimeout(()=>index<scenes.length-1?setIndex(v=>v+1):router.push("/shift"),3600);return()=>clearTimeout(t)},[started,index,router]);
+ const router=useRouter(); const career=useCareerStore(); const[index,setIndex]=useState(0); const[started,setStarted]=useState(false); const[step,setStep]=useState<"film"|"identity"|"hometown"|"background"|"ambition">("film"); const[name,setName]=useState(""); const[hometown,setHometown]=useState("Keşanlı"); const[background,setBackground]=useState("esnaf"); const[ambition,setAmbition]=useState("kendi_firma"); const scene=scenes[index];
+ useEffect(()=>{if(step!=="film"||!started)return;const t=setTimeout(()=>index<scenes.length-1?setIndex(v=>v+1):setStep("identity"),3600);return()=>clearTimeout(t)},[started,index,step]);
+ const finish=()=>{career.startCareer(name||"Çırak",hometown,background,ambition);router.push("/shift");};
  return <main className="fixed inset-0 bg-black text-white overflow-hidden">
-  {scenes.map((s,i)=><img key={s.image} src={s.image} alt="" className={"absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 "+(i===index?"opacity-100":"opacity-0")}/>)}
-  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/35 to-black/20"/>
-  <div className="absolute top-0 left-0 right-0 p-5 sm:p-8 flex justify-between">
-   <div><div className="text-[9px] tracking-[.45em] text-amber-400 font-black">NEXORA INTERACTIVE</div><div className="text-[10px] text-white/45 tracking-widest mt-1">OTOGAR TYCOON · ORIGINAL STORY</div></div>
-   <button onClick={()=>router.push("/shift")} className="text-[10px] tracking-widest text-white/50 border border-white/10 rounded-full px-3 py-2">ATLA</button>
-  </div>
-  {!started?<div className="absolute inset-0 flex items-center justify-center px-6 text-center"><div className="max-w-3xl">
-   <div className="text-[10px] tracking-[.55em] text-amber-400 font-black mb-5">1987 · İSTANBUL</div>
-   <h1 className="text-5xl sm:text-7xl md:text-8xl font-black leading-none">Bir Otobüs.<br/><span className="text-amber-400">Bir İsim.</span><br/>Bir Hayat.</h1>
-   <p className="mt-6 text-sm sm:text-base text-white/60 max-w-xl mx-auto">Bir otogarın kalabalığında başlayan hikâyenin nereye gideceğine sen karar vereceksin.</p>
-   <button onClick={()=>setStarted(true)} className="mt-9 px-8 py-4 rounded-full bg-white text-black font-black text-sm hover:scale-105 transition">HİKÂYEYİ BAŞLAT</button>
-  </div></div>:
-  <div className="absolute left-0 right-0 bottom-0 p-6 sm:p-12"><div className="max-w-5xl mx-auto">
-   <div className="flex items-center gap-3 text-[10px] tracking-[.3em] text-amber-400 font-black"><span>{scene.year}</span><span className="w-8 h-px bg-amber-400/50"/><span>{scene.place}</span></div>
-   <h2 className="text-3xl sm:text-5xl md:text-6xl font-black mt-3 max-w-4xl">{scene.line}</h2><p className="text-sm sm:text-lg text-white/55 mt-3">{scene.sub}</p>
-   <div className="mt-6 flex gap-1">{scenes.map((_,i)=><div key={i} className={"h-1 rounded-full transition-all duration-700 "+(i<=index?"w-12 bg-amber-400":"w-6 bg-white/20")}/>)}</div>
+  {scenes.map((s,i)=><img key={s.image} src={s.image} alt="" className={"absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 "+(i===index&&step==="film"?"opacity-100":"opacity-0")}/>)}
+  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/45 to-black/20"/>
+  <div className="absolute top-0 left-0 right-0 p-5 sm:p-8 flex justify-between z-10"><div><div className="text-[9px] tracking-[.45em] text-amber-400 font-black">NEXORA INTERACTIVE</div><div className="text-[10px] text-white/45 tracking-widest mt-1">OTOGAR TYCOON · ORIGINAL STORY</div></div>{step==="film"&&<button onClick={()=>setStep("identity")} className="text-[10px] tracking-widest text-white/50 border border-white/10 rounded-full px-3 py-2">ATLA</button>}</div>
+  {step==="film"&&!started?<div className="absolute inset-0 flex items-center justify-center px-6 text-center z-10"><div className="max-w-3xl"><div className="text-[10px] tracking-[.55em] text-amber-400 font-black mb-5">1987 · İSTANBUL</div><h1 className="text-5xl sm:text-7xl md:text-8xl font-black leading-none">Bir Otobüs.<br/><span className="text-amber-400">Bir İsim.</span><br/>Bir Hayat.</h1><p className="mt-6 text-sm sm:text-base text-white/60 max-w-xl mx-auto">Bu hikâyenin kahramanı hazır değil. Henüz.</p><button onClick={()=>setStarted(true)} className="mt-9 px-8 py-4 rounded-full bg-white text-black font-black text-sm hover:scale-105 transition">HİKÂYEYİ BAŞLAT</button></div></div>:null}
+  {step==="film"&&started?<div className="absolute left-0 right-0 bottom-0 p-6 sm:p-12 z-10"><div className="max-w-5xl mx-auto"><div className="flex items-center gap-3 text-[10px] tracking-[.3em] text-amber-400 font-black"><span>{scene.year}</span><span className="w-8 h-px bg-amber-400/50"/><span>{scene.place}</span></div><h2 className="text-3xl sm:text-5xl md:text-6xl font-black mt-3 max-w-4xl">{scene.line}</h2><p className="text-sm sm:text-lg text-white/55 mt-3">{scene.sub}</p><div className="mt-6 flex gap-1">{scenes.map((_,i)=><div key={i} className={"h-1 rounded-full transition-all duration-700 "+(i<=index?"w-12 bg-amber-400":"w-6 bg-white/20")}/>)}</div></div></div>:null}
+  {step!=="film"&&<div className="absolute inset-0 flex items-center justify-center px-5 py-10 overflow-y-auto z-10"><div className="w-full max-w-2xl rounded-3xl border border-white/10 bg-black/70 backdrop-blur-xl p-6 sm:p-9 shadow-2xl">
+   {step==="identity"&&<><div className="text-[10px] tracking-[.4em] text-amber-400 font-black">İLK SAYFA</div><h2 className="text-3xl sm:text-5xl font-black mt-3">Perona gelmeden önce<br/>seni tanıyalım.</h2><p className="text-sm text-white/50 mt-3">Bunlar sadece profil soruları değil. Cevapların hikâyenin sana hitap etme biçimini ve başlangıç yolunu etkiler.</p><label className="block text-xs text-zinc-400 mt-7 mb-2">Adın ne?</label><input autoFocus value={name} onChange={e=>setName(e.target.value.slice(0,24))} placeholder="Örn. Eymen" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-amber-500"/><button disabled={!name.trim()} onClick={()=>setStep("hometown")} className="mt-5 w-full py-3 rounded-xl bg-amber-500 text-black font-black disabled:opacity-30">Devam</button></>}
+   {step==="hometown"&&<Choice title="Nerelisin?" sub="Memleketin oyundaki hitabını, ilk bağlantılarını ve başlangıç rotalarını etkiler." options={cities.map(x=>[x,x==="Keşanlı"?"Trakya bağlantısı güçlü":"Memleket bağı ve yerel çevre"])} selected={hometown} onSelect={setHometown} onNext={()=>setStep("background")}/>}
+   {step==="background"&&<Choice title="Nereden geliyorsun?" sub="Geçmişin ilk yıllardaki güçlü tarafını belirler." options={backgrounds.map(x=>[x[0],x[1],x[2]])} selected={background} onSelect={setBackground} onNext={()=>setStep("ambition")}/>}
+   {step==="ambition"&&<Choice title="Bu hayattan ne istiyorsun?" sub="Bu cevap ileride açılacak hikâye dallarının tonunu belirleyecek." options={ambitions.map(x=>[x[0],x[1],x[2]])} selected={ambition} onSelect={setAmbition} onNext={finish} final/>}
   </div></div>}
  </main>;
+}
+function Choice({title,sub,options,selected,onSelect,onNext,final=false}:{title:string;sub:string;options:string[][];selected:string;onSelect:(x:string)=>void;onNext:()=>void;final?:boolean}){
+ return <><div className="text-[10px] tracking-[.4em] text-amber-400 font-black">KARAKTER DOSYASI</div><h2 className="text-3xl sm:text-5xl font-black mt-3">{title}</h2><p className="text-sm text-white/50 mt-3">{sub}</p><div className="grid sm:grid-cols-2 gap-3 mt-7">{options.map(o=><button key={o[0]} onClick={()=>onSelect(o[0])} className={"text-left rounded-2xl border p-4 transition "+(selected===o[0]?"border-amber-500 bg-amber-950/30":"border-white/10 bg-white/[0.03] hover:border-white/25")}><div className="font-black">{o[1]}</div><div className="text-xs text-white/45 mt-1">{o[2]||""}</div></button>)}</div><button onClick={onNext} className="mt-6 w-full py-3 rounded-xl bg-white text-black font-black">{final?"PERONA GİR":"Devam"}</button></>;
 }
