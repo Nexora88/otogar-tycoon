@@ -15,6 +15,8 @@ export type StoryChapter = {
   location: string;
   intro: string;
   scene: string;
+  visual: string;
+  mood: string;
   unlock: { rank?: string; day?: number };
   choices: StoryChoice[];
 };
@@ -27,6 +29,8 @@ export const STORY_CAMPAIGN: StoryChapter[] = [
     location: "Esenler Otogarı · İstanbul",
     intro: "Sabahın ilk ışığında otogar uyanırken sen kapıda bekliyorsun. Cebinde az para, elinde küçük bir çanta ve kafanda tek bir soru var: Buradan kendi şirketimi çıkarabilir miyim?",
     scene: "Patron Hasan Usta seni baştan aşağı süzüyor. “Çıraklık kolay değil. Burada insan tanırsın, yol tanırsın, para tanırsın. Ama önce sözünün ağırlığını öğrenirsin.” Tam o sırada perona gelen yaşlı bir yolcu biletinin yanlış kesildiğini söylüyor.",
+    visual: "/story/esenler-morning.svg",
+    mood: "Sabah telaşı · İlk izlenim", 
     unlock: { day: 1 },
     choices: [
       { id: "help", label: "Yolcuyla ilgilen", text: "Kâr yok. Ama ilk kez biri adını hatırlıyor.", trust: 3, fame: 2, savings: 120, branch: "temiz" },
@@ -41,6 +45,8 @@ export const STORY_CAMPAIGN: StoryChapter[] = [
     location: "Esenler · Gece",
     intro: "Üçüncü haftanda artık seni tanıyanlar var. Bir gece seferinden önce bir valiz kayboluyor. Patronun ilk kez bütün sorumluluğu sana bırakıyor.",
     scene: "Valizin içinde para olduğu söyleniyor. Bir abi kulağına eğilip “Boş ver, yarın bulunur” diyor. Diğer tarafta yaşlı bir kadın, valizin oğlundan kaldığını anlatıyor.",
+    visual: "/story/terminal-night.svg",
+    mood: "Gece vardiyası · Güven sınavı", 
     unlock: { day: 3 },
     choices: [
       { id: "search", label: "Emanet deposunu tek tek ara", text: "Saatler sürdü. Valiz bulundu.", trust: 4, fame: 3, savings: 80, branch: "temiz" },
@@ -55,6 +61,8 @@ export const STORY_CAMPAIGN: StoryChapter[] = [
     location: "Esenler · Yazıhane",
     intro: "Bir ay sonra artık işin ritmini biliyorsun. Fakat aynı peronda senden hızlı yükselen biri var. Metin Abi seni kenara çekip patronun defterinde bir açığı gösteriyor.",
     scene: "“Bu açık kimin üstüne kalacak?” diyor. Cevap verirsen birinin canı sıkılacak. Susarsan senin sicilin temiz kalacak. İlk kez para değil, taraf seçiyorsun.",
+    visual: "/story/terminal-night.svg",
+    mood: "Yazıhane · İlk kırılma", 
     unlock: { day: 5 },
     choices: [
       { id: "truth", label: "Defteri patrona göster", text: "Kolay değildi. Patron sana artık çocuk gibi bakmıyor.", trust: 6, fame: 3, savings: -100, branch: "temiz" },
@@ -69,6 +77,8 @@ export const STORY_CAMPAIGN: StoryChapter[] = [
     location: "İstanbul → Bursa",
     intro: "Aylar sonra kaptanın yanında ilk kez sefere çıkma fırsatı doğuyor. Artık otogarın dışındaki Türkiye'yi görüyorsun.",
     scene: "Bursa yolunda yağmur başlıyor. Kaptan yorgun. Muavin senden karar bekliyor. Bu yolculuk sana yalnızca para değil, şehirlerin nasıl çalıştığını öğretecek.",
+    visual: "/story/bursa-rain.svg",
+    mood: "Yol · İlk gerçek sorumluluk", 
     unlock: { day: 10 },
     choices: [
       { id: "safe", label: "Güvenliği öne al", text: "Sefer biraz gecikti ama yolcular seni konuştu.", trust: 5, fame: 4, savings: 500, branch: "güven" },
@@ -83,6 +93,8 @@ export const STORY_CAMPAIGN: StoryChapter[] = [
     location: "İstanbul · Küçük Yazıhane",
     intro: "Yıllardır başkasının tabelasının altında çalıştın. Şimdi küçük bir masa kiralayabilecek kadar birikimin var.",
     scene: "Elinde iki seçenek var: eski bir yazıhaneyi ucuza devralmak ya da daha küçük başlayıp kendi adını tabelaya yazmak. İlk kez verdiğin karar doğrudan senin şirketinin adını taşıyacak.",
+    visual: "/story/boardroom.svg",
+    mood: "Küçük yazıhane · İlk imza", 
     unlock: { day: 18 },
     choices: [
       { id: "small", label: "Küçük ama kendi tabelam", text: "Büyüme yavaş. Ama ilk kez tabelada senin soyadın var.", trust: 6, fame: 7, savings: -6000, branch: "marka" },
@@ -97,6 +109,8 @@ export const STORY_CAMPAIGN: StoryChapter[] = [
     location: "İstanbul · Terminal",
     intro: "Kendi firman artık peronda. Fakat yanında yeni bir tabela beliriyor. Rakibin ucuz biletle geliyor.",
     scene: "Patronluk sandığın kadar yalnız değil. Bir taraf fiyat kırmanı, bir taraf hizmete yatırım yapmanı istiyor. Karar ilk gerçek pazar savaşını başlatacak.",
+    visual: "/story/boardroom.svg",
+    mood: "Karşı peron · İlk rekabet", 
     unlock: { day: 25 },
     choices: [
       { id: "price", label: "Fiyatla cevap ver", text: "Yolcu arttı. Marj daraldı.", trust: -1, fame: 4, savings: 3500, branch: "fiyat" },
@@ -111,6 +125,8 @@ export const STORY_CAMPAIGN: StoryChapter[] = [
     location: "İstanbul · Yönetim Masası",
     intro: "Şirket büyüdü. Artık her karar bir otobüs satın almaktan daha büyük.",
     scene: "Bir yatırımcı masaya oturuyor. “Sana para veririm. Ama şirketin bir kısmını bana bırak.” İlk kez şirketinin geleceğiyle kendi kontrolün arasında seçim yapıyorsun.",
+    visual: "/story/boardroom.svg",
+    mood: "Yönetim masası · Sermaye", 
     unlock: { day: 40 },
     choices: [
       { id: "bootstrapped", label: "Kendi paramla büyü", text: "Kontrol sende kaldı. Büyüme yavaş ama bağımsız.", trust: 5, fame: 5, savings: 6000, branch: "bağımsız" },
@@ -125,6 +141,8 @@ export const STORY_CAMPAIGN: StoryChapter[] = [
     location: "İstanbul · Borsa",
     intro: "Yıllar önce çay taşıdığın peronda başlayan hikâye şimdi borsaya geliyor.",
     scene: "Ekranda şirketinin adı beliriyor. İlk kez şirketinin değeri senin cebindeki paradan daha önemli. Bir karar daha var: büyümeyi hızlandırmak mı, kontrolü korumak mı?",
+    visual: "/story/boardroom.svg",
+    mood: "Borsa · Zil çalıyor", 
     unlock: { day: 60 },
     choices: [
       { id: "growth", label: "Yeni şehirler", text: "Sermayeyi filoya ve ağ genişlemesine yatır.", trust: 3, fame: 8, savings: 10000, branch: "ulusal" },
