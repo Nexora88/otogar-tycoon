@@ -38,7 +38,9 @@ export default function DashboardPage() {
 
   const hint = useMemo(() => {
     if (mafiaDebtDue)
-      return { href: "/office", t: "Kapıda aidat — ofisi aç" };
+      return { href: "/kulis", t: "Kapı çaldı — kulise bak" };
+    if (gameDay >= 1 && gameDay < 3)
+      return { href: "/story", t: "Şirket hikâyeni başlat" };
     if (bankDebt > 0 && bankDebt >= balance)
       return { href: "/office", t: "Banka borcu kritik — ödeme planı" };
     if (active.length === 0 && buses.length > 0)
@@ -46,7 +48,7 @@ export default function DashboardPage() {
     if (reputation < 40)
       return { href: "/staff", t: "İtibar toparla — kadro & ikram" };
     return { href: "/map", t: "Haritadan hat seç, peronu yönet" };
-  }, [mafiaDebtDue, bankDebt, balance, active.length, buses.length, reputation]);
+  }, [mafiaDebtDue, gameDay, bankDebt, balance, active.length, buses.length, reputation]);
 
   return (
     <div className="min-h-full bg-[#0c0a08] text-stone-100">
@@ -314,6 +316,8 @@ export default function DashboardPage() {
             ["/map", "Harita", "Hatlar", "border-emerald-900/30"],
             ["/lobby", "Lobi", "Rakip", "border-sky-900/30"],
             ["/events", "Etkinlik", "Açık oda", "border-rose-900/30"],
+            ["/story", "Hikâye", "Kararların", "border-purple-900/40"],
+            ["/kulis", "Kulis", "Teklifler", "border-orange-800/40"],
             ["/achievements", "Başarılar", "Hedefler", "border-amber-700/40"],
           ].map(([href, title, sub, border]) => (
             <Link
