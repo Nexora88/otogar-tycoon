@@ -5,6 +5,7 @@ import { persist } from "zustand/middleware";
 import { getGlobalGameClock } from "@/lib/gameTime";
 import { CITIES_1987 } from "@/data/cities1987";
 import { ROUTES } from "@/data/routes";
+import { companyValuation, IPO_RULES, routeCompetition, routeDemand } from "@/lib/marketEngine";
 import {
   getCalendarBeat,
   calendarHeadlineForPaper,
@@ -292,6 +293,18 @@ export interface GameState {
   restStopDealLevel: number;
   offlineReport: OfflineReport | null;
   rivals: RivalCompany[];
+  patronBalance: number;
+  companyValuation: number;
+  companyRevenue: number;
+  companyProfit: number;
+  companyRoutes: string[];
+  routeMarket: Record<string, { dailyPassengers: number; playerShare: number; rivalShare: number; unmet: number }>;
+  listed: boolean;
+  totalShares: number;
+  founderShares: number;
+  publicShares: number;
+  stockPrice: number;
+  dividendsPaid: number;
 
   startAsGuest: () => void;
   setCompanyName: (n: string) => void;
@@ -373,6 +386,10 @@ export interface GameState {
   clearOfflineReport: () => void;
   processOfflineProgress: (fromMs: number, toMs: number) => void;
   advanceRivals: (days: number) => void;
+  refreshMarket: () => void;
+  payOwnerSalary: (amount: number) => boolean;
+  prepareIPO: () => boolean;
+  simulateStockMarket: () => void;
 }
 
 // ═══════════════════════════════════════════
@@ -983,6 +1000,18 @@ function createInitialState() {
     restStopDealLevel: 0,
     offlineReport: null as OfflineReport | null,
     rivals: RIVAL_POOL.map((r) => ({ ...r })),
+    patronBalance: 0,
+    companyValuation: 25000,
+    companyRevenue: 0,
+    companyProfit: 0,
+    companyRoutes: [],
+    routeMarket: {},
+    listed: false,
+    totalShares: 1000000,
+    founderShares: 1000000,
+    publicShares: 0,
+    stockPrice: 25,
+    dividendsPaid: 0,
   };
 }
 
@@ -1156,6 +1185,8 @@ export const useGameStore = create<GameState>()(
         if (clock.gameDay !== prevD) {
           const elapsedGameDays = Math.min(30, Math.max(1, clock.totalDays - previousClock.totalDays));
           get().advanceRivals(elapsedGameDays);
+          get().refreshMarket();
+          get().simulateStockMarket();
           const dailyWages = get().drivers.reduce((sum, d) => sum + d.wage, 0) * elapsedGameDays;
           const dailyTerminal = (get().terminalSlots || []).reduce((sum, slot) => sum + (SLOT_INFO[slot]?.cps || 0) * 20, 0) * elapsedGameDays;
           if (dailyWages > 0 || dailyTerminal > 0) {
@@ -1338,8 +1369,69 @@ export const useGameStore = create<GameState>()(
         }
       },
 
-      rollRoadEvent: (exp) => {
-        if (Math.random() > 0.32) return null;
+      refreshMarket: () => {
+        const state = get();
+        const routes = Array.from(new Set([
+          ...state.companyRoutes,
+          ...state.expeditions.map((e) => e.origin + " → " + e.destination),
+          ...state.rivals.flatMap((r) => r.routes),
+        ])).slice(0, 24);
+        const routeMarket: GameState["routeMarket"] = {};
+        let weightedShare = 0;
+        for (const route of routes) {
+          const c = routeCompetition(route, state.reputation, state.buses.length, 1, state.rivals);
+          routeMarket[route] = { dailyPassengers: routeDemand(route, state.demandMultiplier, state.gameDay), playerShare: c.playerShare, rivalShare: c.rivalShare, unmet: c.unmet };
+          weightedShare += c.playerShare;
+        }
+        const averageShare = routes.length ? weightedShare / routes.length : 0;
+        const completedRevenue = state.expeditions.reduce((sum, e) => sum + (e.status === "completed" ? e.soldTickets * e.ticketPrice : 0), 0);
+        const recentProfit = state.ledger.slice(0, 30).filter((x) => /Sefer kâr|Çevrimdışı sefer/.test(x.label)).reduce((sum, x) => sum + x.amount, 0);
+        const valuation = companyValuation({ revenue: state.companyRevenue + completedRevenue, profit: state.companyProfit + recentProfit, fleet: state.buses.length, reputation: state.reputation, marketShare: averageShare, debt: state.bankDebt });
+        set({ routeMarket, companyValuation: valuation });
+      },
+
+      payOwnerSalary: (amount) => {
+        const pay = Math.max(0, Math.min(10000, Math.floor(amount)));
+        if (!pay || !get().spendMoney(pay)) return false;
+        set((s) => ({ patronBalance: s.patronBalance + pay }));
+        get().addLedger("Patron maaşı", -pay);
+        get().pushPhone("Muhasebe", "Şirket kasasından patron maaşı: " + pay.toLocaleString("tr-TR") + " ₺.");
+        return true;
+      },
+
+      prepareIPO: () => {
+        const state = get();
+        if (state.listed) return true;
+        get().refreshMarket();
+        const current = get();
+        const routes = Object.keys(current.routeMarket).length;
+        const eligible = current.companyValuation >= IPO_RULES.minValuation && current.buses.length >= IPO_RULES.minFleet && current.reputation >= IPO_RULES.minReputation && routes >= IPO_RULES.minRoutes;
+        if (!eligible) {
+          get().pushPhone("Borsa", "Halka arz için değerleme ≥ 1.0M, 5 otobüs, 60 itibar ve 3 aktif hat gerekiyor.");
+          return false;
+        }
+        const publicShares = Math.round(current.totalShares * (1 - IPO_RULES.founderOwnershipAfter));
+        const price = Math.max(10, Math.round(current.companyValuation / current.totalShares));
+        const proceeds = publicShares * price;
+        set({ listed: true, founderShares: current.totalShares - publicShares, publicShares, stockPrice: price, balance: current.balance + proceeds });
+        get().addLedger("Halka arz sermayesi", proceeds);
+        get().pushPhone("Borsa", current.companyName + " halka arz edildi. Kurucu payı %80. Sermaye +" + proceeds.toLocaleString("tr-TR") + " ₺.");
+        set((s) => ({ morningPaper: [news("ipo-" + Date.now(), "Borsa / Halka Arz", current.companyName + " ilk kez halka açıldı. Hisse " + price + " ₺.", { tag: "economy", aboutPlayer: true, day: current.gameDay }), ...s.morningPaper].slice(0, 14) }));
+        return true;
+      },
+
+      simulateStockMarket: () => {
+        const state = get();
+        if (!state.listed) return;
+        const marketRoutes = Object.values(state.routeMarket);
+        const share = marketRoutes.length ? marketRoutes.reduce((a, x) => a + x.playerShare, 0) / marketRoutes.length : 0;
+        const signal = (state.reputation - 50) / 500 + (share - 50) / 500 + (state.companyProfit > 0 ? 0.03 : -0.02);
+        const shock = (Math.random() - 0.5) * 0.06;
+        const next = Math.max(1, Math.round(state.stockPrice * (1 + signal + shock)));
+        set({ stockPrice: next });
+      },
+
+      rollRoadEvent: (exp) => {        if (Math.random() > 0.32) return null;
         const ev = pick(ROAD_EVENT_POOL);
         if (ev.moneyChange) {
           set((s) => ({ balance: s.balance + ev.moneyChange }));
@@ -1363,8 +1455,10 @@ export const useGameStore = create<GameState>()(
         return ev;
       },
 
-      addExpedition: (e) =>
-        set((s) => ({ expeditions: [e, ...s.expeditions].slice(0, 40) })),
+      addExpedition: (e) => {
+        set((s) => ({ expeditions: [e, ...s.expeditions].slice(0, 40), companyRoutes: Array.from(new Set([...s.companyRoutes, e.origin + " → " + e.destination])) }));
+        get().refreshMarket();
+      },
 
       updateExpedition: (id, p) =>
         set((s) => ({
@@ -1374,7 +1468,7 @@ export const useGameStore = create<GameState>()(
         })),
 
       settleExpeditionProfit: (p) => {
-        set((s) => ({ balance: s.balance + p }));
+        set((s) => ({ balance: s.balance + p, companyRevenue: s.companyRevenue + Math.max(0, p), companyProfit: s.companyProfit + p }));
         get().addLedger("Sefer kâr/zarar", p);
         if (p > 0) get().accrueTax(Math.round(p * 0.05));
         if (p < -2000) {
@@ -2072,6 +2166,19 @@ export const useGameStore = create<GameState>()(
         serviceUpgradeLevel: s.serviceUpgradeLevel,
         restStopDealLevel: s.restStopDealLevel,
         offlineReport: s.offlineReport,
+        rivals: s.rivals,
+        patronBalance: s.patronBalance,
+        companyValuation: s.companyValuation,
+        companyRevenue: s.companyRevenue,
+        companyProfit: s.companyProfit,
+        companyRoutes: s.companyRoutes,
+        routeMarket: s.routeMarket,
+        listed: s.listed,
+        totalShares: s.totalShares,
+        founderShares: s.founderShares,
+        publicShares: s.publicShares,
+        stockPrice: s.stockPrice,
+        dividendsPaid: s.dividendsPaid,
         phoneMessages: s.phoneMessages.slice(0, 20),
       }),
     }
