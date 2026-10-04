@@ -14,8 +14,6 @@ import { ROUTES } from "@/data/routes";
 import { sendPrice } from "@/lib/roomChannel";
 import { Route, Plus, Fuel, User } from "lucide-react";
 
-const FUEL_PRICE = 42;
-
 const MAFIA_LINES = [
   "Ağa, 5 koli ‘hediye’ Ankara’ya. Bagaja at, temiz ₺10.000.",
   "Sınırdan geldi, soru sorma. Senin payın peşin.",
@@ -73,7 +71,7 @@ export default function ExpeditionsPage() {
   const maxP = Math.round((route?.distance || 400) * 2.1 * mult);
   const fuelEst = bus
     ? Math.round(
-        ((route?.distance || 400) / 100) * (bus.fuelUse || 28) * FUEL_PRICE
+        ((route?.distance || 400) / 100) * (bus.fuelUse || 28) * useGameStore.getState().fuelPrice
       )
     : 0;
 
@@ -98,7 +96,7 @@ export default function ExpeditionsPage() {
           );
           const ratio = exp.ticketPrice / maxPrice;
           const chance =
-            Math.max(0.12, 0.82 - ratio * 0.7) * st.crierBonus();
+            Math.min(0.98, Math.max(0.12, 0.82 - ratio * 0.7) * st.crierBonus() * st.demandMultiplier * (1 + st.officeUpgradeLevel * 0.025));
           if (Math.random() < chance && exp.soldTickets < exp.maxSeats) {
             const add = ratio < 0.4 ? 2 + Math.floor(Math.random() * 3) : 1;
             const sold = Math.min(exp.soldTickets + add, exp.maxSeats);
@@ -135,18 +133,28 @@ export default function ExpeditionsPage() {
           if (elapsed > driveMs) {
             const b = st.buses.find((x) => x.id === exp.busId);
             const fuel = Math.round(
-              ((r?.distance || 400) / 100) * (b?.fuelUse || 28) * FUEL_PRICE
+              ((r?.distance || 400) / 100) * (b?.fuelUse || 28) * st.fuelPrice
             );
-            const cat =
+            const cat = Math.round(
               exp.soldTickets *
-              (CATERING_INFO[exp.catering]?.perSeat || 10);
+              (CATERING_INFO[exp.catering]?.perSeat || 10) *
+              Math.max(0.7, 1 - st.serviceUpgradeLevel * 0.05)
+            );
             const mu = b?.muavinCost || 400;
-            let revenue = exp.soldTickets * exp.ticketPrice;
+            const restBonus = exp.soldTickets * st.restStopDealLevel * 4;
+            let revenue = exp.soldTickets * exp.ticketPrice + restBonus;
             if (exp.smuggle) revenue += exp.smugglePaid || 10000;
             const cost = fuel + cat + mu;
             const profit = revenue - cost;
+            const driver = st.drivers.find((d) => d.id === exp.driverId);
+            const wear = Math.min(18, Math.max(2, Math.ceil((r?.distance || 400) / 180) + Math.floor((driver?.fatigue || 0) / 25)));
+            if (b) {
+              useGameStore.setState((s) => ({
+                buses: s.buses.map((x) => x.id === b.id ? { ...x, engineHealth: Math.max(5, x.engineHealth - wear) } : x),
+              }));
+            }
 
-            const rep = CATERING_INFO[exp.catering]?.repMod || 0;
+            const rep = (CATERING_INFO[exp.catering]?.repMod || 0) + st.serviceUpgradeLevel;
             if (rep !== 0) {
               useGameStore.setState((s) => ({
                 reputation: Math.max(0, Math.min(100, s.reputation + rep)),

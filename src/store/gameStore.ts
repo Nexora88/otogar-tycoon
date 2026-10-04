@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { getGlobalGameClock } from "@/lib/gameTime";
 import { CITIES_1987 } from "@/data/cities1987";
+import { ROUTES } from "@/data/routes";
 import {
   getCalendarBeat,
   calendarHeadlineForPaper,
@@ -199,6 +200,16 @@ export interface InspectorVisit {
   bribe: number;
 }
 
+export interface OfflineReport {
+  minutesAway: number;
+  gameDays: number;
+  wages: number;
+  terminalIncome: number;
+  completedExpeditions: number;
+  fuelSpent: number;
+  generatedAt: number;
+}
+
 export interface GameState {
   isGuest: boolean;
   companyName: string;
@@ -262,6 +273,11 @@ export interface GameState {
   pendingInterview: PendingInterview | null;
   officeTheme: OfficeTheme;
   inspector: InspectorVisit | null;
+  demandMultiplier: number;
+  officeUpgradeLevel: number;
+  serviceUpgradeLevel: number;
+  restStopDealLevel: number;
+  offlineReport: OfflineReport | null;
 
   startAsGuest: () => void;
   setCompanyName: (n: string) => void;
@@ -337,6 +353,11 @@ export interface GameState {
   restDriver: (id: string) => void;
   setOfficeTheme: (t: OfficeTheme) => void;
   resolveInspector: (choice: "pay" | "bribe") => void;
+  upgradeOffice: () => boolean;
+  upgradeService: () => boolean;
+  signRestStopDeal: () => boolean;
+  clearOfflineReport: () => void;
+  processOfflineProgress: (fromMs: number, toMs: number) => void;
 }
 
 // ═══════════════════════════════════════════
@@ -934,6 +955,11 @@ function createInitialState() {
     pendingInterview: null as PendingInterview | null,
     officeTheme: "classic" as OfficeTheme,
     inspector: null as InspectorVisit | null,
+    demandMultiplier: 1,
+    officeUpgradeLevel: 0,
+    serviceUpgradeLevel: 0,
+    restStopDealLevel: 0,
+    offlineReport: null as OfflineReport | null,
   };
 }
 
@@ -950,10 +976,15 @@ export const useGameStore = create<GameState>()(
       setCompanyName: (n) => set({ companyName: n.slice(0, 40) }),
       setPlayerName: (n) => set({ playerName: n.slice(0, 30) }),
 
-      addMoney: (a) => set((s) => ({ balance: s.balance + a })),
+      addMoney: (a) => {
+        const amount = Math.max(0, Math.floor(a));
+        if (!amount) return;
+        set((s) => ({ balance: s.balance + amount }));
+      },
       spendMoney: (a) => {
-        if (get().balance < a) return false;
-        set((s) => ({ balance: s.balance - a }));
+        const amount = Math.max(0, Math.floor(a));
+        if (!amount || get().balance < amount) return false;
+        set((s) => ({ balance: s.balance - amount }));
         return true;
       },
 
@@ -1082,6 +1113,8 @@ export const useGameStore = create<GameState>()(
       tickGameTime: () => {
         const prevH = get().gameHour;
         const prevD = get().gameDay;
+        const previousTick = get().lastTimeTick || Date.now();
+        const previousClock = getGlobalGameClock(previousTick);
         const clock = getGlobalGameClock();
         set({
           gameDay: clock.gameDay,
@@ -1098,6 +1131,14 @@ export const useGameStore = create<GameState>()(
         }
 
         if (clock.gameDay !== prevD) {
+          const elapsedGameDays = Math.min(30, Math.max(1, clock.totalDays - previousClock.totalDays));
+          const dailyWages = get().drivers.reduce((sum, d) => sum + d.wage, 0) * elapsedGameDays;
+          const dailyTerminal = (get().terminalSlots || []).reduce((sum, slot) => sum + (SLOT_INFO[slot]?.cps || 0) * 20, 0) * elapsedGameDays;
+          if (dailyWages > 0 || dailyTerminal > 0) {
+            set((s) => ({ balance: s.balance + dailyTerminal - dailyWages }));
+            if (dailyTerminal) get().addLedger(`Terminal geliri ×${elapsedGameDays}`, dailyTerminal);
+            if (dailyWages) get().addLedger(`Personel maaşı ×${elapsedGameDays}`, -dailyWages);
+          }
           const beat = getCalendarBeat();
           const mood: DayMoodLite =
             beat.mood === "mourning"
@@ -1117,6 +1158,8 @@ export const useGameStore = create<GameState>()(
             paperNotify: "morning",
             bayramActive:
               clock.gameDay % 7 === 0 || beat.mood === "national",
+            demandMultiplier:
+              clock.gameDay % 7 === 0 || beat.mood === "national" ? 2.2 : 1,
             rivalWeak: Math.random() > 0.75,
             ağaEnergy: Math.min(100, get().ağaEnergy + 10),
           });
@@ -1138,7 +1181,22 @@ export const useGameStore = create<GameState>()(
             get().mafiaVisit();
           }
 
-          get().collectPassiveIncome();
+          if (elapsedGameDays > 1 || Date.now() - previousTick > 60_000) {
+            const offlineWages = dailyWages;
+            const offlineTerminal = dailyTerminal;
+            set({
+              offlineReport: {
+                minutesAway: Math.max(1, Math.round((Date.now() - previousTick) / 60_000)),
+                gameDays: elapsedGameDays,
+                wages: offlineWages,
+                terminalIncome: offlineTerminal,
+                completedExpeditions: 0,
+                fuelSpent: 0,
+                generatedAt: Date.now(),
+              },
+            });
+            get().pushPhone("Muhasebe", `Döndün. ${elapsedGameDays} oyun günü maaş/terminal hesabı işlendi.`);
+          }
 
           const debt = get().bankDebt;
           const lastI = get().lastDebtInterestDay || 0;
@@ -1205,6 +1263,10 @@ export const useGameStore = create<GameState>()(
             paperNotify: "evening",
           });
           get().pushPhone("Hakiki Peron", "Akşam baskısı çıktı.");
+        }
+
+        if (Date.now() - previousTick >= 60_000) {
+          get().processOfflineProgress(previousTick, Date.now());
         }
       },
 
@@ -1509,15 +1571,13 @@ export const useGameStore = create<GameState>()(
         const cost = city
           ? city.licenseCost + Math.round(city.plotCost * 0.25)
           : 20000;
-        if (get().balance >= cost) {
-          get().spendMoney(cost);
-          get().addLedger("Ruhsat / arsa", -cost);
-        }
+        if (!city || !get().spendMoney(cost)) return false;
+        get().addLedger("Ruhsat / arsa", -cost);
         set({
           setupDone: true,
           homeCityId: cityId,
-          terminalName: city ? `${city.name} Yazıhane` : "Yazıhane",
-          officeTitle: city ? `${city.name} Yazıhane` : "Yazıhane",
+          terminalName: `${city.name} Yazıhane`,
+          officeTitle: `${city.name} Yazıhane`,
           terminalBuilt: true,
         });
         get().pushPhone(
@@ -1550,15 +1610,7 @@ export const useGameStore = create<GameState>()(
       resetGameFull: () => get().startAsGuest(),
 
       collectPassiveIncome: () => {
-        let gain = 0;
-        (get().terminalSlots || []).forEach((s) => {
-          const info = SLOT_INFO[s];
-          if (info) gain += info.cps * 20;
-        });
-        if (gain > 0) {
-          set((s) => ({ balance: s.balance + gain }));
-          get().addLedger("Terminal pasif", gain);
-        }
+        get().pushPhone("Muhasebe", "Terminal geliri artık her oyun gününde otomatik işlendi; manuel toplama yok.");
       },
 
       upgradeAccounting: () => {
@@ -1828,6 +1880,99 @@ export const useGameStore = create<GameState>()(
         }
         set({ inspector: null });
       },
+
+      upgradeOffice: () => {
+        const level = get().officeUpgradeLevel;
+        if (level >= 5) return false;
+        const cost = 7000 * (level + 1);
+        if (!get().spendMoney(cost)) return false;
+        set((s) => ({ officeUpgradeLevel: s.officeUpgradeLevel + 1 }));
+        get().addLedger(`Yazıhane yükseltme sv.${level + 1}`, -cost);
+        get().pushPhone("Usta", `Yazıhane yükseltildi. Konfor seviyesi ${level + 1}.`);
+        return true;
+      },
+
+      upgradeService: () => {
+        const level = get().serviceUpgradeLevel;
+        if (level >= 5) return false;
+        const cost = 9000 * (level + 1);
+        if (!get().spendMoney(cost)) return false;
+        set((s) => ({ serviceUpgradeLevel: s.serviceUpgradeLevel + 1 }));
+        get().addLedger(`İkram mutfağı sv.${level + 1}`, -cost);
+        get().pushPhone("Muavin Salih", `İkram stoğu ve servis hızlandı. Sv.${level + 1}.`);
+        return true;
+      },
+
+      signRestStopDeal: () => {
+        const level = get().restStopDealLevel;
+        if (level >= 4) return false;
+        const cost = 12000 * (level + 1);
+        if (!get().spendMoney(cost)) return false;
+        set((s) => ({ restStopDealLevel: s.restStopDealLevel + 1 }));
+        get().addLedger(`Dinlenme tesisi anlaşması sv.${level + 1}`, -cost);
+        get().pushPhone("Tesis", `Yol üstü anlaşma yenilendi. Komisyon ağı sv.${level + 1}.`);
+        return true;
+      },
+
+      clearOfflineReport: () => set({ offlineReport: null }),
+
+      processOfflineProgress: (fromMs, toMs) => {
+        const awayMs = Math.max(0, toMs - fromMs);
+        if (awayMs < 60_000) return;
+        const state = get();
+        let completed = 0;
+        let fuelSpent = 0;
+        let totalProfit = 0;
+        const next = state.expeditions.map((exp) => {
+          if (exp.status !== "filling" && exp.status !== "departed") return exp;
+          const route = ROUTES.find((r) => r.origin === exp.origin && r.destination === exp.destination);
+          if (!route) return exp;
+          const bus = state.buses.find((b) => b.id === exp.busId);
+          if (!bus) return exp;
+          const driveMs = Math.min(100000, Math.max(40000, route.distance * 90));
+          const due = exp.departureTime + driveMs;
+          if (toMs < exp.departureTime) return exp;
+          let sold = exp.soldTickets;
+          if (exp.status === "filling") {
+            const demand = Math.min(1, 0.35 + state.crierLevel * 0.06 + (state.demandMultiplier - 1) * 0.35 + state.officeUpgradeLevel * 0.025);
+            sold = Math.max(sold, Math.min(exp.maxSeats, Math.round(exp.maxSeats * demand)));
+          }
+          if (toMs < due) {
+            return { ...exp, status: "departed" as const, soldTickets: sold, passengers: generatePassengers(sold), progress: Math.min(0.99, Math.max(0, (toMs - exp.departureTime) / driveMs)) };
+          }
+          const fuel = Math.round((route.distance / 100) * (bus.fuelUse || 28) * state.fuelPrice);
+          const cateringCost = Math.round(sold * (CATERING_INFO[exp.catering]?.perSeat || 10) * Math.max(0.7, 1 - state.serviceUpgradeLevel * 0.05));
+          const muavin = bus.muavinCost || 400;
+          const restBonus = sold * state.restStopDealLevel * 4;
+          const revenue = sold * exp.ticketPrice + (exp.smuggle ? exp.smugglePaid || 0 : 0) + restBonus;
+          const profit = revenue - fuel - cateringCost - muavin;
+          totalProfit += profit;
+          fuelSpent += fuel;
+          completed += 1;
+          const wear = Math.min(18, Math.max(2, Math.ceil(route.distance / 180) + Math.floor((state.drivers.find((d) => d.id === exp.driverId)?.fatigue || 0) / 25)));
+          const repGain = (CATERING_INFO[exp.catering]?.repMod || 0) + state.serviceUpgradeLevel;
+          if (exp.driverId) {
+            const driver = state.drivers.find((d) => d.id === exp.driverId);
+            if (driver) state.drivers = state.drivers.map((d) => d.id === driver.id ? { ...d, onExpedition: false, fatigue: Math.min(100, d.fatigue + 18 + Math.floor(route.distance / 300)) } : d);
+          }
+          if (exp.muavinId) state.drivers = state.drivers.map((d) => d.id === exp.muavinId ? { ...d, onExpedition: false } : d);
+          state.buses = state.buses.map((b) => b.id === bus.id ? { ...b, engineHealth: Math.max(5, b.engineHealth - wear) } : b);
+          state.reputation = Math.max(0, Math.min(100, state.reputation + repGain));
+          return { ...exp, status: "completed" as const, soldTickets: sold, passengers: generatePassengers(sold), progress: 1, currentEvent: null };
+        });
+        if (completed > 0 || totalProfit !== 0) {
+          set({ expeditions: next, buses: state.buses, drivers: state.drivers, reputation: state.reputation });
+          get().settleExpeditionProfit(totalProfit);
+          get().addLedger(`Çevrimdışı sefer ×${completed}`, totalProfit);
+        } else if (next.some((e, i) => e !== state.expeditions[i])) {
+          set({ expeditions: next });
+        }
+        if (completed > 0 || awayMs >= 60_000) {
+          const previousReport = get().offlineReport;
+          set({ offlineReport: { minutesAway: Math.round(awayMs / 60_000), gameDays: Math.floor(awayMs / 240_000), wages: previousReport?.wages || 0, terminalIncome: previousReport?.terminalIncome || 0, completedExpeditions: completed, fuelSpent, generatedAt: toMs } });
+          if (completed > 0) get().pushPhone("Muhasebe", `${completed} sefer sen yokken kapandı. ${Math.round(totalProfit)} ₺ net.`);
+        }
+      },
     }),
     {
       name: "otogar-tycoon-v14",
@@ -1864,6 +2009,11 @@ export const useGameStore = create<GameState>()(
         deskRented: s.deskRented,
         crierLevel: s.crierLevel,
         officeTheme: s.officeTheme,
+        demandMultiplier: s.demandMultiplier,
+        officeUpgradeLevel: s.officeUpgradeLevel,
+        serviceUpgradeLevel: s.serviceUpgradeLevel,
+        restStopDealLevel: s.restStopDealLevel,
+        offlineReport: s.offlineReport,
         phoneMessages: s.phoneMessages.slice(0, 20),
       }),
     }

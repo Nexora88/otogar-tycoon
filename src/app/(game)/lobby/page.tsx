@@ -33,6 +33,8 @@ export default function LobbyPage() {
   const shareRoomText = useGameStore((s) => s.shareRoomText);
   const roomCode = useGameStore((s) => s.roomCode);
   const roomName = useGameStore((s) => s.roomName);
+  const expeditions = useGameStore((s) => s.expeditions);
+  const crierLevel = useGameStore((s) => s.crierLevel);
   const spendMoney = useGameStore((s) => s.spendMoney);
   const addLedger = useGameStore((s) => s.addLedger);
 
@@ -49,6 +51,8 @@ export default function LobbyPage() {
   const [connected, setConnected] = useState(false);
   const [boardTab, setBoardTab] = useState<"money" | "score">("money");
   const [targets, setTargets] = useState<string[]>([]);
+  const [selectedTarget, setSelectedTarget] = useState("");
+  const [selectedRoute, setSelectedRoute] = useState("");
   const [saboLog, setSaboLog] = useState<string[]>([]);
 
   const display = playerName || companyName || "Esnaf";
@@ -144,19 +148,25 @@ export default function LobbyPage() {
           );
         },
         onSabotage: (s) => {
-          setSaboLog((x) =>
-            [`${s.from} → ${s.target}: ${s.kind}`, ...x].slice(0, 8)
-          );
+          setSaboLog((x) => [`${s.from} → ${s.target}: ${s.kind}${s.route ? " · " + s.route : ""}`, ...x].slice(0, 8));
+          const power = Math.max(1, Math.min(6, s.power || 1));
           if (s.target === display || s.target === firm) {
-            const penalty = s.kind === "ariza" ? 1500 : 800;
+            const penalty = s.kind === "ariza" ? 1500 : s.kind === "yakit" ? 800 : 0;
             useGameStore.setState((st) => ({
               balance: Math.max(0, st.balance - penalty),
-              reputation: Math.max(
-                0,
-                st.reputation - (s.kind === "ariza" ? 2 : 0)
-              ),
+              reputation: Math.max(0, st.reputation - (s.kind === "ariza" ? 2 : 0)),
+              expeditions: st.expeditions.map((exp) => {
+                if (s.kind !== "crier" || !s.route || exp.status !== "filling" || exp.origin + " → " + exp.destination !== s.route) return exp;
+                return { ...exp, soldTickets: Math.max(0, exp.soldTickets - power) };
+              }),
             }));
-            useGameStore.getState().addLedger("Rakip darbesi", -penalty);
+            if (penalty) useGameStore.getState().addLedger("Rakip darbesi", -penalty);
+            if (s.kind === "crier") useGameStore.getState().pushPhone("Peron", "Rakip çığırtkan yolcuyu çekmeye çalıştı.");
+          }
+          if (s.from === display && s.kind === "crier" && s.route) {
+            useGameStore.setState((st) => ({
+              expeditions: st.expeditions.map((exp) => exp.status === "filling" && exp.origin + " → " + exp.destination === s.route ? { ...exp, soldTickets: Math.min(exp.maxSeats, exp.soldTickets + power) } : exp),
+            }));
           }
         },
       });
@@ -484,6 +494,31 @@ export default function LobbyPage() {
                 )}
               </div>
             )}
+          </div>
+
+          <div className="bg-zinc-900 border border-cyan-900/40 rounded-2xl p-4">
+            <div className="text-[10px] tracking-widest text-cyan-400 font-bold mb-1">ÇIĞIRTKAN · CANLI PERON HAMLESİ</div>
+            <p className="text-[11px] text-zinc-500 mb-3">Rakibin dolum yapan hattına anlık yolcu çekme hamlesi. Seviye arttıkça hamle gücü artar.</p>
+            <div className="grid sm:grid-cols-2 gap-2">
+              <select value={selectedTarget} onChange={(e) => setSelectedTarget(e.target.value)} className="bg-zinc-950 border border-zinc-700 rounded-lg px-2 py-2 text-xs">
+                <option value="">Rakip seç…</option>
+                {targets.filter((t) => t !== firm).map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <select value={selectedRoute} onChange={(e) => setSelectedRoute(e.target.value)} className="bg-zinc-950 border border-zinc-700 rounded-lg px-2 py-2 text-xs">
+                <option value="">Hat seç…</option>
+                {expeditions.filter((x) => x.status === "filling").map((x) => <option key={x.id} value={x.origin + " → " + x.destination}>{x.origin} → {x.destination}</option>)}
+              </select>
+            </div>
+            <button type="button" disabled={!connected || !selectedTarget || !selectedRoute} onClick={() => {
+              const cost = 800 + crierLevel * 450;
+              const power = 1 + crierLevel;
+              if (!spendMoney(cost)) { alert("Kasa yetmiyor"); return; }
+              addLedger("Çığırtkan hamlesi", -cost);
+              void sendSabotage(display, selectedTarget, "crier", selectedRoute, power);
+              setSaboLog((x) => ["Sen → " + selectedTarget + " · " + selectedRoute + " · çığırtkan " + power, ...x].slice(0, 8));
+            }} className="mt-3 w-full py-2 rounded-lg bg-cyan-500 text-black text-xs font-bold disabled:opacity-40">
+              Gönder · {800 + crierLevel * 450} ₺ · güç {1 + crierLevel}
+            </button>
           </div>
 
           <div className="bg-zinc-900 border border-red-900/30 rounded-2xl p-4">

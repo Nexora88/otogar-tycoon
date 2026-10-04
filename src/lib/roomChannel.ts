@@ -26,6 +26,8 @@ export type SabotagePing = {
   from: string;
   target: string;
   kind: "ariza" | "yakit" | "crier";
+  route?: string;
+  power?: number;
   at: number;
 };
 
@@ -193,13 +195,17 @@ export async function sendAuctionBid(
 export async function sendSabotage(
   from: string,
   target: string,
-  kind: "ariza" | "yakit" | "crier"
+  kind: "ariza" | "yakit" | "crier",
+  route?: string,
+  power = 1
 ) {
   if (!channel) return false;
   const payload: SabotagePing = {
     from,
     target,
     kind,
+    route,
+    power,
     at: Date.now(),
   };
   await channel.send({ type: "broadcast", event: "sabotage", payload });
