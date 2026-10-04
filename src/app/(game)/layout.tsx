@@ -12,6 +12,7 @@ import MafiaModal from "@/components/MafiaModal";
 import MeetingModal from "@/components/MeetingModal";
 import TicketReceipt from "@/components/TicketReceipt";
 import InspectorModal from "@/components/InspectorModal";
+import EcosystemAds from "@/components/EcosystemAds";
 
 const NAV: {
   href: string;
@@ -227,7 +228,10 @@ export default function GameLayout({
           </div>
         )}
 
-        <main className="flex-1 w-full">{children}</main>
+        <main className="flex-1 w-full">
+          {children}
+          <EcosystemAds />
+        </main>
       </div>
 
       <PhoneUI />

@@ -78,10 +78,15 @@ export default function ShiftPage() {
 
   return (
     <div className="p-4 sm:p-8 max-w-lg mx-auto pb-24">
-      <div className="mb-3 p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-[11px] text-zinc-500 leading-relaxed">
-        <strong className="text-amber-500/90">Çırak modu:</strong> Sefer / garaj /
-        pazar kilitli. Görev + ani olay (kavga, kapı, yolcu). Hedef: rütbe veya
-        ~12.000 ₺ birikim → istifa / bağımsız → terminal.
+      <div className="mb-4 rounded-2xl border border-amber-900/50 bg-gradient-to-r from-amber-950/30 via-zinc-950 to-cyan-950/20 p-4">
+        <div className="text-[10px] tracking-[0.24em] text-amber-500 font-black">1987 · PERONDA İLK GÜN</div>
+        <h2 className="text-lg font-black mt-1">Burada sadece görev yapmıyorsun. Bir isim inşa ediyorsun.</h2>
+        <p className="text-xs text-zinc-400 mt-2 leading-5">Her vardiya patronla ilişkin, ustaların güveni, kulisler, iş teklifleri ve ani olaylarla şirketinin geleceğini şekillendiriyor. Temiz kalabilir, hızlı yükselebilir veya kendi yolunu açabilirsin.</p>
+        <div className="flex flex-wrap gap-2 mt-3 text-[10px]">
+          <span className="px-2 py-1 rounded-full bg-zinc-900 border border-zinc-800">GÜVEN → rütbe</span>
+          <span className="px-2 py-1 rounded-full bg-zinc-900 border border-zinc-800">TANINIRLIK → fırsat</span>
+          <span className="px-2 py-1 rounded-full bg-zinc-900 border border-zinc-800">SEÇİMLER → hikâye</span>
+        </div>
       </div>
 
       <div className="flex flex-wrap justify-between gap-2 mb-4">
