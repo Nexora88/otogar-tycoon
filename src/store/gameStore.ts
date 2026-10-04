@@ -1175,7 +1175,7 @@ export const useGameStore = create<GameState>()(
           lastTimeTick: Date.now(),
         });
 
-        get().applyCalendarBeat(getCalendarBeat());
+        get().applyCalendarBeat(getCalendarBeat(new Date(), clock.gameDay));
 
         if (clock.gameHour !== prevH && Math.random() > 0.72) {
           const amb = pick(PHONE_AMBIENT);
@@ -1194,13 +1194,13 @@ export const useGameStore = create<GameState>()(
             if (dailyTerminal) get().addLedger(`Terminal geliri ×${elapsedGameDays}`, dailyTerminal);
             if (dailyWages) get().addLedger(`Personel maaşı ×${elapsedGameDays}`, -dailyWages);
           }
-          const beat = getCalendarBeat();
+          const beat = getCalendarBeat(new Date(), clock.gameDay);
           const mood: DayMoodLite =
             beat.mood === "mourning"
               ? "mourning"
               : beat.mood === "national"
                 ? "national"
-                : get().calendarMood;
+                : "normal";
           const morning = buildMorningPaperLocal(
             clock.gameDay,
             get().fuelPrice,
@@ -1211,6 +1211,9 @@ export const useGameStore = create<GameState>()(
             morningPaper: morning,
             newspaper: morning,
             paperNotify: "morning",
+            calendarMood: mood,
+            calendarTitle: beat.title,
+            lastCalendarCode: beat.code,
             bayramActive:
               clock.gameDay % 7 === 0 || beat.mood === "national",
             demandMultiplier:
@@ -1219,6 +1222,13 @@ export const useGameStore = create<GameState>()(
             ağaEnergy: Math.min(100, get().ağaEnergy + 10),
           });
           get().pushPhone("Hakiki Peron", "Sabah baskısı çıktı.");
+          if (beat.mood !== "normal") {
+            get().pushPhone(beat.phoneFrom || "Nexora Labs", beat.phoneBody);
+            set((s) => ({
+              morningPaper: [{ id: "calendar-" + beat.code + "-" + clock.gameDay, title: beat.title, headline: beat.paperLine, body: beat.bakracLine, tag: beat.mood === "mourning" ? "Saygı" : "Bayram", kind: beat.mood === "mourning" ? "yas" : "bayram", day: clock.gameDay }, ...s.morningPaper].slice(0,14),
+              newspaper: [{ id: "calendar-" + beat.code + "-" + clock.gameDay, title: beat.title, headline: beat.paperLine, body: beat.bakracLine, tag: beat.mood === "mourning" ? "Saygı" : "Bayram", kind: beat.mood === "mourning" ? "yas" : "bayram", day: clock.gameDay }, ...s.newspaper].slice(0,14),
+            }));
+          }
 
           if (get().isGuest && clock.gameDay > get().guestDayLimit) {
             set({ forceRegister: true });

@@ -37,6 +37,7 @@ const NAV: {
   { href: "/story", label: "Hikâye" },
   { href: "/kulis", label: "Kulis" },
   { href: "/events", label: "Etkinlik" },
+  { href: "/how-to-play", label: "Nasıl Oynanır" },
   { href: "/lobby", label: "Lobi" },
   { href: "/auction", label: "Borsa", needBoss: true },
 ];

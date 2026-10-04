@@ -1,142 +1,17 @@
 "use client";
-
 import { useGameStore } from "@/store/gameStore";
-
-export default function NewspaperModal() {
-  const open = useGameStore((s) => s.newspaperOpen);
-  const edition = useGameStore((s) => s.paperEdition);
-  const paper = useGameStore((s) => s.newspaper);
-  const close = useGameStore((s) => s.closeNewspaper);
-  const companyName = useGameStore((s) => s.companyName);
-  const gameDay = useGameStore((s) => s.gameDay);
-  const calendarMood = useGameStore((s) => s.calendarMood);
-  const calendarTitle = useGameStore((s) => s.calendarTitle);
-
-  if (!open) return null;
-
-  const mourning = calendarMood === "mourning";
-  const national = calendarMood === "national";
-
-  const sheet = mourning
-    ? "bg-[#1a1a1a] text-stone-300 border-stone-600"
-    : "bg-[#e8dcc8] text-stone-900 border-stone-500";
-
-  const items = paper.slice(0, 6);
-
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 p-3 sm:p-6">
-      <div
-        className={`relative w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-sm border-2 shadow-2xl ${sheet}`}
-      >
-        {/* Gazete üst bandı */}
-        <div
-          className={`px-4 pt-4 pb-2 border-b ${
-            mourning ? "border-stone-700" : "border-stone-800/40"
-          }`}
-        >
-          <div className="flex justify-between items-start gap-2">
-            <div>
-              <div
-                className={`text-[10px] tracking-[0.35em] font-bold uppercase ${
-                  mourning ? "text-stone-500" : "text-stone-700"
-                }`}
-              >
-                Hakiki Peron Gazetesi
-              </div>
-              <div className="font-serif text-xl sm:text-2xl font-bold mt-1 leading-tight">
-                {edition === "evening" ? "Akşam Baskısı" : "Sabah Baskısı"}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={close}
-              className={`text-xs px-2 py-1 rounded border ${
-                mourning
-                  ? "border-stone-600 text-stone-400"
-                  : "border-stone-700 text-stone-800"
-              }`}
-            >
-              Kapat
-            </button>
-          </div>
-          <div
-            className={`text-[11px] mt-2 font-serif ${
-              mourning ? "text-stone-500" : "text-stone-600"
-            }`}
-          >
-            Gün {gameDay} · {companyName || "Esnaf"} · 1987
-            {calendarTitle ? ` · ${calendarTitle}` : ""}
-            {national ? " · Coşku" : ""}
-            {mourning ? " · Saygı" : ""}
-          </div>
-        </div>
-
-        {/* Manşet */}
-        {items[0] && (
-          <article className="px-4 py-4 border-b border-stone-800/20">
-            <div
-              className={`text-[9px] uppercase tracking-widest mb-1 ${
-                mourning ? "text-stone-500" : "text-red-900/70"
-              }`}
-            >
-              {items[0].tag || "Manşet"}
-              {items[0].aboutPlayer ? " · Sizin haberiniz" : ""}
-            </div>
-            <h2 className="font-serif text-lg sm:text-xl font-bold leading-snug">
-              {items[0].headline || items[0].title}
-            </h2>
-            <p
-              className={`mt-2 text-sm leading-relaxed font-serif ${
-                mourning ? "text-stone-400" : "text-stone-800"
-              }`}
-            >
-              {items[0].body}
-            </p>
-          </article>
-        )}
-
-        {/* Diğer sütunlar */}
-        <div className="px-4 py-3 space-y-4">
-          {items.slice(1).map((n) => (
-            <article key={n.id} className="border-b border-stone-800/15 pb-3 last:border-0">
-              <div
-                className={`text-[9px] uppercase tracking-wider mb-0.5 ${
-                  mourning ? "text-stone-600" : "text-stone-500"
-                }`}
-              >
-                {n.tag || "Haber"}
-                {n.aboutPlayer ? " · Esnaf" : ""}
-              </div>
-              <h3 className="font-serif font-bold text-[15px] leading-snug">
-                {n.headline || n.title}
-              </h3>
-              <p
-                className={`mt-1 text-[13px] leading-relaxed font-serif ${
-                  mourning ? "text-stone-400" : "text-stone-700"
-                }`}
-              >
-                {n.body}
-              </p>
-            </article>
-          ))}
-
-          {items.length === 0 && (
-            <p className="text-sm font-serif text-stone-500 py-6 text-center">
-              Bu baskıda sütun boş. Saat ilerlesin.
-            </p>
-          )}
-        </div>
-
-        <div
-          className={`px-4 py-3 text-center text-[10px] font-serif border-t ${
-            mourning
-              ? "border-stone-700 text-stone-600"
-              : "border-stone-800/30 text-stone-600"
-          }`}
-        >
-          Yurtta sulh, cihanda sulh · Otogar Tycoon · Gerçek para yoktur
-        </div>
-      </div>
-    </div>
-  );
+export default function NewspaperModal(){
+ const open=useGameStore(s=>s.newspaperOpen), edition=useGameStore(s=>s.paperEdition), paper=useGameStore(s=>s.newspaper), close=useGameStore(s=>s.closeNewspaper);
+ const company=useGameStore(s=>s.companyName), day=useGameStore(s=>s.gameDay), mood=useGameStore(s=>s.calendarMood), title=useGameStore(s=>s.calendarTitle), year=useGameStore(s=>s.gameYear);
+ if(!open)return null;
+ const mourning=mood==="mourning", national=mood==="national", items=paper.slice(0,10), lead=items[0];
+ const bg= mourning ? "bg-[#111111] text-stone-200 border-stone-700" : national ? "bg-[#f4e7c8] text-stone-950 border-amber-700" : "bg-[#eee2c9] text-stone-950 border-stone-500";
+ return <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 p-2 sm:p-6 backdrop-blur-sm"><div className={`relative w-full max-w-5xl max-h-[94vh] overflow-y-auto border-2 shadow-2xl ${bg}`}>
+  <div className="p-4 sm:p-7 border-b-4 border-double border-current/40"><div className="flex justify-between items-start gap-4"><div><div className="text-[9px] tracking-[.5em] uppercase opacity-60">NEXORA PRESS · OTOGAR GÜNDEMİ</div><h1 className="font-serif text-4xl sm:text-6xl font-black tracking-tight leading-none mt-2">HAKİKİ PERON</h1><div className="font-serif text-xs sm:text-sm mt-2 opacity-70">{year||1987} · Gün {day} · {edition==="evening"?"AKŞAM BASKISI":"SABAH BASKISI"} · {company||"Esnaf"}</div></div><button onClick={close} className="rounded-full border border-current/40 px-4 py-2 text-xs font-bold">Kapat</button></div>{title&&<div className="mt-5 p-3 border-y border-current/30 text-center font-serif font-bold">{title} · {mourning?"SAYGI BASKISI":"ÖZEL GÜN BASKISI"}</div>}</div>
+  <div className="grid lg:grid-cols-[1.7fr_1fr_1fr] divide-y lg:divide-y-0 lg:divide-x divide-current/20">
+   <article className="p-5 sm:p-7 lg:min-h-[390px]">{lead?<><div className="text-[9px] font-black tracking-[.3em] uppercase opacity-60">{lead.tag||"MANŞET"}{lead.aboutPlayer?" · OTOGARDA SİZ":""}</div><h2 className="font-serif text-3xl sm:text-5xl font-black leading-[.95] mt-2">{lead.headline||lead.title}</h2><p className="font-serif text-base sm:text-lg leading-relaxed mt-5 opacity-80">{lead.body}</p><div className="mt-7 pt-3 border-t border-current/20 text-[10px] uppercase tracking-widest opacity-50">Peron · Ekonomi · Yol · Şehir · Rakipler</div></>:<div className="py-20 text-center opacity-50">Baskı hazırlanıyor.</div>}</article>
+   <section className="p-5 sm:p-6 space-y-5"><h3 className="font-serif text-xl font-black border-b border-current/30 pb-2">ŞEHİR & YOL</h3>{items.slice(1,5).map(n=><article key={n.id}><div className="text-[8px] uppercase tracking-widest opacity-50">{n.tag||"Haber"}</div><h4 className="font-serif text-lg font-bold leading-tight mt-1">{n.headline||n.title}</h4><p className="font-serif text-sm leading-relaxed opacity-70 mt-1">{n.body}</p></article>)}</section>
+   <section className="p-5 sm:p-6 space-y-5"><h3 className="font-serif text-xl font-black border-b border-current/30 pb-2">OTOGAR EKONOMİ</h3>{items.slice(5,10).map(n=><article key={n.id}><div className="text-[8px] uppercase tracking-widest opacity-50">{n.tag||"Piyasa"}</div><h4 className="font-serif text-lg font-bold leading-tight mt-1">{n.headline||n.title}</h4><p className="font-serif text-sm leading-relaxed opacity-70 mt-1">{n.body}</p></article>)}{national&&<div className="border-2 border-current/30 p-4 font-serif font-bold text-center">NEXORA LABS<br/><span className="text-sm font-normal">Bayramımız kutlu olsun.</span></div>}{mourning&&<div className="border border-current/30 p-4 font-serif text-center">Saygıyla ve minnetle.</div>}</section>
+  </div><footer className="border-t-4 border-double border-current/40 p-3 sm:p-4 flex flex-wrap justify-between gap-2 text-[9px] uppercase tracking-widest opacity-55"><span>Nexora Labs · Otogar Tycoon</span><span>Gerçek para yoktur · Simülasyon</span><span>Yurtta sulh, cihanda sulh</span></footer>
+ </div></div>;
 }

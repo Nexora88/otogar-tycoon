@@ -1,33 +1,8 @@
 export const CITIES_1987 = [
-  { id: "edirne", name: "Edirne", region: "Marmara", plotCost: 32000, licenseCost: 11000, x: 8, y: 22 },
-  { id: "tekirdag", name: "Tekirdağ", region: "Marmara", plotCost: 33000, licenseCost: 11000, x: 14, y: 24 },
-  { id: "istanbul", name: "İstanbul", region: "Marmara", plotCost: 95000, licenseCost: 30000, x: 18, y: 26 },
-  { id: "bursa", name: "Bursa", region: "Marmara", plotCost: 48000, licenseCost: 15000, x: 20, y: 36 },
-  { id: "balikesir", name: "Balıkesir", region: "Marmara", plotCost: 36000, licenseCost: 12000, x: 16, y: 42 },
-  { id: "canakkale", name: "Çanakkale", region: "Marmara", plotCost: 34000, licenseCost: 11000, x: 10, y: 34 },
-  { id: "izmir", name: "İzmir", region: "Ege", plotCost: 70000, licenseCost: 22000, x: 14, y: 56 },
-  { id: "manisa", name: "Manisa", region: "Ege", plotCost: 38000, licenseCost: 13000, x: 18, y: 54 },
-  { id: "aydin", name: "Aydın", region: "Ege", plotCost: 36000, licenseCost: 12000, x: 18, y: 64 },
-  { id: "mugla", name: "Muğla", region: "Ege", plotCost: 40000, licenseCost: 14000, x: 22, y: 72 },
-  { id: "denizli", name: "Denizli", region: "Ege", plotCost: 38000, licenseCost: 13000, x: 26, y: 62 },
-  { id: "ankara", name: "Ankara", region: "İç Anadolu", plotCost: 60000, licenseCost: 20000, x: 46, y: 40 },
-  { id: "eskisehir", name: "Eskişehir", region: "İç Anadolu", plotCost: 40000, licenseCost: 13000, x: 34, y: 38 },
-  { id: "konya", name: "Konya", region: "İç Anadolu", plotCost: 42000, licenseCost: 14000, x: 42, y: 56 },
-  { id: "kayseri", name: "Kayseri", region: "İç Anadolu", plotCost: 40000, licenseCost: 14000, x: 58, y: 50 },
-  { id: "sivas", name: "Sivas", region: "İç Anadolu", plotCost: 34000, licenseCost: 11000, x: 64, y: 40 },
-  { id: "antalya", name: "Antalya", region: "Akdeniz", plotCost: 52000, licenseCost: 17000, x: 36, y: 76 },
-  { id: "adana", name: "Adana", region: "Akdeniz", plotCost: 48000, licenseCost: 16000, x: 58, y: 70 },
-  { id: "mersin", name: "Mersin", region: "Akdeniz", plotCost: 44000, licenseCost: 15000, x: 54, y: 72 },
-  { id: "hatay", name: "Hatay", region: "Akdeniz", plotCost: 38000, licenseCost: 13000, x: 66, y: 78 },
-  { id: "samsun", name: "Samsun", region: "Karadeniz", plotCost: 40000, licenseCost: 14000, x: 58, y: 24 },
-  { id: "trabzon", name: "Trabzon", region: "Karadeniz", plotCost: 38000, licenseCost: 13000, x: 72, y: 26 },
-  { id: "zonguldak", name: "Zonguldak", region: "Karadeniz", plotCost: 34000, licenseCost: 11000, x: 40, y: 22 },
-  { id: "erzurum", name: "Erzurum", region: "Doğu", plotCost: 30000, licenseCost: 10000, x: 82, y: 36 },
-  { id: "van", name: "Van", region: "Doğu", plotCost: 28000, licenseCost: 9500, x: 90, y: 48 },
-  { id: "malatya", name: "Malatya", region: "Doğu", plotCost: 32000, licenseCost: 11000, x: 70, y: 52 },
-  { id: "diyarbakir", name: "Diyarbakır", region: "Güneydoğu", plotCost: 34000, licenseCost: 12000, x: 76, y: 60 },
-  { id: "gaziantep", name: "Gaziantep", region: "Güneydoğu", plotCost: 42000, licenseCost: 14000, x: 68, y: 66 },
-  { id: "sanliurfa", name: "Şanlıurfa", region: "Güneydoğu", plotCost: 36000, licenseCost: 12000, x: 74, y: 68 },
-] as const;
-
+  ["Adana","Akdeniz"],["Adıyaman","Güneydoğu"],["Afyonkarahisar","Ege"],["Ağrı","Doğu"],["Amasya","Karadeniz"],["Ankara","İç Anadolu"],["Antalya","Akdeniz"],["Artvin","Karadeniz"],["Aydın","Ege"],["Balıkesir","Marmara"],["Bilecik","Marmara"],["Bingöl","Doğu"],["Bitlis","Doğu"],["Bolu","Karadeniz"],["Burdur","Akdeniz"],["Bursa","Marmara"],["Çanakkale","Marmara"],["Çankırı","İç Anadolu"],["Çorum","Karadeniz"],["Denizli","Ege"],["Diyarbakır","Güneydoğu"],["Edirne","Marmara"],["Elazığ","Doğu"],["Erzincan","Doğu"],["Erzurum","Doğu"],["Eskişehir","İç Anadolu"],["Gaziantep","Güneydoğu"],["Giresun","Karadeniz"],["Gümüşhane","Karadeniz"],["Hakkâri","Doğu"],["Hatay","Akdeniz"],["Isparta","Akdeniz"],["İçel","Akdeniz"],["İstanbul","Marmara"],["İzmir","Ege"],["Kars","Doğu"],["Kastamonu","Karadeniz"],["Kayseri","İç Anadolu"],["Kırklareli","Marmara"],["Kırşehir","İç Anadolu"],["Kocaeli","Marmara"],["Konya","İç Anadolu"],["Kütahya","Ege"],["Malatya","Doğu"],["Manisa","Ege"],["Kahramanmaraş","Akdeniz"],["Mardin","Güneydoğu"],["Muğla","Ege"],["Muş","Doğu"],["Nevşehir","İç Anadolu"],["Niğde","İç Anadolu"],["Ordu","Karadeniz"],["Rize","Karadeniz"],["Sakarya","Marmara"],["Samsun","Karadeniz"],["Siirt","Güneydoğu"],["Sinop","Karadeniz"],["Sivas","İç Anadolu"],["Tekirdağ","Marmara"],["Tokat","Karadeniz"],["Trabzon","Karadeniz"],["Tunceli","Doğu"],["Şanlıurfa","Güneydoğu"],["Uşak","Ege"],["Van","Doğu"],["Yozgat","İç Anadolu"],["Zonguldak","Karadeniz"]
+].map(([name, region], i) => ({
+  id: name.toLowerCase().replaceAll(" ","-").replaceAll("ı","i").replaceAll("ğ","g").replaceAll("ü","u").replaceAll("ş","s").replaceAll("ö","o").replaceAll("ç","c").replaceAll("â","a"),
+  name, region, plotCost: 28000 + (i % 9) * 3500, licenseCost: 9000 + (i % 6) * 1200,
+  x: 8 + ((i * 13) % 84), y: 14 + ((i * 17) % 70)
+}));
 export type City1987 = (typeof CITIES_1987)[number];

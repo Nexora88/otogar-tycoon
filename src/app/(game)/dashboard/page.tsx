@@ -25,6 +25,7 @@ export default function DashboardPage() {
   const teaStock = useGameStore((s) => s.teaStock);
   const ağaEnergy = useGameStore((s) => s.ağaEnergy);
   const calendarTitle = useGameStore((s) => s.calendarTitle);
+  const calendarMood = useGameStore((s) => s.calendarMood);
 
   const active = useMemo(
     () =>
@@ -151,6 +152,12 @@ export default function DashboardPage() {
             </div>
           )}
         </section>
+
+        {calendarTitle && (
+          <section className="mb-5 rounded-2xl border border-cyan-900/40 bg-gradient-to-r from-cyan-950/30 via-zinc-950 to-amber-950/20 p-4 shadow-lg">
+            <div className="flex items-center justify-between gap-4"><div><div className="text-[9px] tracking-[.35em] text-cyan-400 font-black">NEXORA LABS · ÖZEL BİLDİRİ</div><div className="text-lg font-black mt-1">{calendarTitle}</div><p className="text-xs text-zinc-500 mt-1">{calendarMood === "mourning" ? "Bugün ekranlarımız sadeleşti. Saygıyla anıyoruz." : "Nexora Labs olarak özel günümüzü kutluyoruz. Otogarlar bugün farklı bir havada."}</p></div><div className="hidden sm:block text-3xl">{calendarMood === "mourning" ? "◼" : "✦"}</div></div>
+          </section>
+        )}
 
         {/* Sonraki hamle */}
         <Link
