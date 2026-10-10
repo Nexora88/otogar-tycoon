@@ -68,7 +68,6 @@ export default function StoryPage() {
     const c = STORY_CAMPAIGN[index];
     if (!c || (c.unlock.day || 0) > state.gameDay) return;
     setSelectedId(c.id);
-    setShowScene(true);
     setChoiceFlash(null);
   };
 

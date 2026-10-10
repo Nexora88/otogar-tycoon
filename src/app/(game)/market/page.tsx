@@ -24,7 +24,7 @@ function BusArt({
   const fill = BODY[color] || "#333";
   const darkText = color === "white" || color === "orange";
   return (
-    <svg viewBox="0 0 240 110" className="w-full h-32">
+    <svg viewBox="0 0 240 110" className="w-full h-32 ot-market-bus">
       <ellipse cx="120" cy="98" rx="90" ry="8" fill="#000" opacity="0.3" />
       {/* gövde 2.5D */}
       <path
@@ -41,10 +41,16 @@ function BusArt({
       {/* şerit */}
       <rect x="20" y="58" width="200" height="5" fill="#f5d76e" opacity="0.85" />
       {/* teker */}
-      <circle cx="55" cy="82" r="12" fill="#1a1a1a" />
-      <circle cx="55" cy="82" r="6" fill="#666" />
-      <circle cx="175" cy="82" r="12" fill="#1a1a1a" />
-      <circle cx="175" cy="82" r="6" fill="#666" />
+      <g className="ot-bus-wheel">
+        <circle cx="55" cy="82" r="12" fill="#1a1a1a" />
+        <circle cx="55" cy="82" r="6" fill="#666" />
+        <path d="M55 77 V87 M50 82 H60" stroke="#a1a1aa" strokeWidth="1.5" />
+      </g>
+      <g className="ot-bus-wheel">
+        <circle cx="175" cy="82" r="12" fill="#1a1a1a" />
+        <circle cx="175" cy="82" r="6" fill="#666" />
+        <path d="M175 77 V87 M170 82 H180" stroke="#a1a1aa" strokeWidth="1.5" />
+      </g>
       {/* far */}
       <rect x="18" y="48" width="8" height="10" rx="1" fill="#f5e6a3" />
       <text
@@ -89,7 +95,7 @@ export default function MarketPage() {
           return (
             <div
               key={b.name}
-              className={`rounded-2xl border bg-zinc-900 overflow-hidden ${
+              className={`ot-market-card rounded-2xl border bg-zinc-900 overflow-hidden transition-all duration-300 hover:-translate-y-1 ${
                 can ? "border-zinc-700" : "border-zinc-900 opacity-60"
               }`}
             >
