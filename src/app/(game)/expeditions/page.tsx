@@ -64,6 +64,10 @@ export default function ExpeditionsPage() {
 
   const route = ROUTES.find((r) => r.id === routeId) || ROUTES[0];
   const bus = buses.find((b) => b.id === busId);
+  const selectedDriver = drivers.find((d) => d.id === driverId);
+  const conditionMultiplier = 0.75 + (bus?.engineHealth ?? 75) / 400;
+  const skillMultiplier = 0.9 + (selectedDriver?.skill ?? 50) / 500;
+  const fatigueMultiplier = 1 - (selectedDriver?.fatigue ?? 75) / 500;
   const driversFree = drivers.filter(
     (d) => d.role === "driver" && !d.onExpedition && d.fatigue < 88
   );
@@ -87,7 +91,10 @@ export default function ExpeditionsPage() {
     Math.max(0.12, 0.82 - priceRatio * 0.7) *
       crierBonus() *
       demandMultiplier *
-      (1 + officeUpgradeLevel * 0.025)
+      (1 + officeUpgradeLevel * 0.025) *
+      conditionMultiplier *
+      skillMultiplier *
+      fatigueMultiplier
   );
   const estimatedPassengers = bus
     ? Math.min(
@@ -138,8 +145,21 @@ export default function ExpeditionsPage() {
             (r?.distance || 400) * 2.1 * st.priceCapMultiplier()
           );
           const ratio = exp.ticketPrice / maxPrice;
-          const chance =
-            Math.min(0.98, Math.max(0.12, 0.82 - ratio * 0.7) * st.crierBonus() * st.demandMultiplier * (1 + st.officeUpgradeLevel * 0.025));
+          const boardingDriver = st.drivers.find((d) => d.id === exp.driverId);
+          const boardingBus = st.buses.find((b) => b.id === exp.busId);
+          const conditionMultiplier = 0.75 + (boardingBus?.engineHealth ?? 75) / 400;
+          const skillMultiplier = 0.9 + (boardingDriver?.skill ?? 50) / 500;
+          const fatigueMultiplier = 1 - (boardingDriver?.fatigue ?? 75) / 500;
+          const chance = Math.min(
+            0.98,
+            Math.max(0.12, 0.82 - ratio * 0.7) *
+              st.crierBonus() *
+              st.demandMultiplier *
+              (1 + st.officeUpgradeLevel * 0.025) *
+              conditionMultiplier *
+              skillMultiplier *
+              fatigueMultiplier
+          );
           if (Math.random() < chance && exp.soldTickets < exp.maxSeats) {
             const add = ratio < 0.4 ? 2 + Math.floor(Math.random() * 3) : 1;
             const sold = Math.min(exp.soldTickets + add, exp.maxSeats);
@@ -515,6 +535,7 @@ export default function ExpeditionsPage() {
               <span>Hat: {route?.distance || 0} km</span>
               <span>Fiyat seviyesi: {priceRatio < 0.4 ? "Uygun · hızlı dolum" : priceRatio > 0.68 ? "Yüksek · satış yavaşlayabilir" : "Dengeli"}</span>
               <span>Motor yıpranması: yaklaşık %{estimatedWear}</span>
+              {selectedDriver && <span>Şoför becerisi: %{selectedDriver.skill} · yorgunluk %{Math.round(selectedDriver.fatigue)}</span>}
               {bus && bus.engineHealth < 45 && <span className="font-semibold text-red-300">Uyarı: motor sağlığı düşük</span>}
             </div>
             <p className="mt-3 text-[10px] leading-relaxed text-zinc-600">
