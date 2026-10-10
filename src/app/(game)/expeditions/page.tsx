@@ -496,9 +496,9 @@ export default function ExpeditionsPage() {
                 </div>
               </div>
               <div className="rounded-lg border border-zinc-800 bg-black/25 p-3">
-                <div className="text-[10px] text-zinc-500">Bilet geliri</div>
-                <div className="mt-1 text-lg font-black text-emerald-300">{formatMoney(estimatedPassengers * ticketPrice)}</div>
-                <div className="mt-1 text-[10px] text-zinc-600">Doluluk tahminine göre</div>
+                <div className="text-[10px] text-zinc-500">Toplam gelir</div>
+                <div className="mt-1 text-lg font-black text-emerald-300">{formatMoney(estimatedRevenue)}</div>
+                <div className="mt-1 text-[10px] text-zinc-600">Bilet + tesis primi</div>
               </div>
               <div className="rounded-lg border border-zinc-800 bg-black/25 p-3">
                 <div className="text-[10px] text-zinc-500">Yakıt + ikram + muavin</div>
