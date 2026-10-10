@@ -517,6 +517,9 @@ export default function ExpeditionsPage() {
               <span>Motor yıpranması: yaklaşık %{estimatedWear}</span>
               {bus && bus.engineHealth < 45 && <span className="font-semibold text-red-300">Uyarı: motor sağlığı düşük</span>}
             </div>
+            <p className="mt-3 text-[10px] leading-relaxed text-zinc-600">
+              Tahmin; yakıt, ikram ve muavin giderlerini kapsar. Şoför maaşı, yol olayları, vergi ve beklenmedik masraflar dahil değildir.
+            </p>
             {estimatedProfit < 0 && (
               <p className="mt-3 rounded-lg border border-red-900/50 bg-red-950/20 p-2.5 text-xs text-red-200">
                 Bu plan mevcut varsayımlarla zarar yazabilir. Bilet fiyatını, ikramı veya daha ekonomik bir hattı değerlendirebilirsin.
