@@ -104,3 +104,105 @@ body.ot-mood-mourning {
 .ot-mood-mourning * {
   --tw-shadow-color: rgb(0 0 0 / 0.5);
 }
+
+/* Small, purposeful motion: only the bus gallery and terminal scene animate. */
+@keyframes ot-bus-idle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+@keyframes ot-wheel-spin {
+  to { transform: rotate(360deg); }
+}
+.ot-market-bus {
+  transform-origin: center;
+  animation: ot-bus-idle 3.8s ease-in-out infinite;
+}
+.ot-bus-wheel {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ot-wheel-spin 2.4s linear infinite;
+}
+.ot-market-card:hover .ot-market-bus {
+  animation-duration: 1.8s;
+}
+.ot-market-card:hover {
+  border-color: rgb(245 158 11 / 0.45);
+  box-shadow: 0 14px 32px rgb(0 0 0 / 0.24);
+}
+
+.ot-terminal-scene {
+  position: relative;
+  overflow: hidden;
+  min-height: 184px;
+  isolation: isolate;
+  background:
+    radial-gradient(ellipse at 18% 10%, rgb(245 158 11 / 0.12), transparent 40%),
+    linear-gradient(180deg, #171717 0%, #101113 55%, #09090b 100%);
+}
+.ot-terminal-scene::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: .35;
+  background-image: linear-gradient(rgb(255 255 255 / .035) 1px, transparent 1px), linear-gradient(90deg, rgb(255 255 255 / .035) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.ot-terminal-road {
+  position: relative;
+  height: 76px;
+  overflow: hidden;
+  container-type: inline-size;
+  background: linear-gradient(180deg, transparent 0%, rgb(9 9 11 / .35) 16%, #27272a 17%, #18181b 100%);
+}
+.ot-terminal-road::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 10px;
+  height: 2px;
+  background: repeating-linear-gradient(90deg, rgb(250 204 21 / .7) 0 24px, transparent 24px 42px);
+  opacity: .7;
+}
+.ot-terminal-lane-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 16px;
+  height: 1px;
+  background: rgb(255 255 255 / .12);
+}
+.ot-traffic-bus {
+  position: absolute;
+  z-index: 1;
+  bottom: 2px;
+  width: clamp(150px, 34cqw, 220px);
+  height: auto;
+  filter: drop-shadow(0 8px 7px rgb(0 0 0 / .45));
+  will-change: transform;
+}
+.ot-traffic-bus-first {
+  animation: ot-terminal-drive 13s linear infinite;
+}
+.ot-traffic-bus-second {
+  animation: ot-terminal-drive 15s linear infinite;
+  animation-delay: -7.5s;
+  opacity: .92;
+}
+@keyframes ot-terminal-drive {
+  from { transform: translateX(-240px); }
+  to { transform: translateX(calc(100cqw + 240px)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ot-market-bus,
+  .ot-bus-wheel,
+  .ot-traffic-bus-first,
+  .ot-traffic-bus-second {
+    animation: none !important;
+  }
+  .ot-market-card {
+    transition: none !important;
+  }
+}
