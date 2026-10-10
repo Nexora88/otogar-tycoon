@@ -26,6 +26,7 @@ export default function DashboardPage() {
   const ağaEnergy = useGameStore((s) => s.ağaEnergy);
   const calendarTitle = useGameStore((s) => s.calendarTitle);
   const calendarMood = useGameStore((s) => s.calendarMood);
+  const ledger = useGameStore((s) => s.ledger);
 
   const active = useMemo(
     () =>
@@ -36,6 +37,15 @@ export default function DashboardPage() {
   );
   const paper = morningPaper[0] || eveningPaper[0];
   const fleet = buses[0];
+  const ledgerSummary = useMemo(() => {
+    const rows = Array.isArray(ledger) ? ledger.filter((row) => Number.isFinite(row.amount)) : [];
+    return {
+      income: rows.reduce((sum, row) => sum + Math.max(0, row.amount), 0),
+      expenses: rows.reduce((sum, row) => sum + Math.max(0, -row.amount), 0),
+      recent: rows.slice(0, 5),
+      count: rows.length,
+    };
+  }, [ledger]);
 
   const hint = useMemo(() => {
     if (mafiaDebtDue)
@@ -174,6 +184,49 @@ export default function DashboardPage() {
           </div>
           <span className="text-orange-400 text-xl">→</span>
         </Link>
+
+        {/* Faz 3: kasa hareketleri — mevcut kayıt defterinden türetilir */}
+        <section className="mb-5 rounded-2xl border border-emerald-900/35 bg-gradient-to-br from-[#101914] via-[#121510] to-[#17110d] p-4 sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-[10px] tracking-[0.2em] text-emerald-500 font-bold">FAZ 3 · FİNANS İSTİHBARATI</div>
+              <h2 className="mt-1 text-lg font-black text-emerald-50">Kasa hareketleri</h2>
+              <p className="mt-1 text-xs text-stone-500">Kayıtlı defter hareketlerinin özeti; mevcut oyun kaydından hesaplanır.</p>
+            </div>
+            <Link href="/office" className="rounded-xl border border-emerald-800/50 px-3 py-2 text-xs text-emerald-300 hover:bg-emerald-950/40">Defteri aç →</Link>
+          </div>
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="rounded-xl border border-emerald-900/40 bg-black/20 p-3">
+              <div className="text-[10px] text-stone-500">Kayıtlı giriş</div>
+              <div className="mt-1 text-lg font-bold text-emerald-300">{formatMoney(ledgerSummary.income)}</div>
+            </div>
+            <div className="rounded-xl border border-red-900/30 bg-black/20 p-3">
+              <div className="text-[10px] text-stone-500">Kayıtlı çıkış</div>
+              <div className="mt-1 text-lg font-bold text-red-300">{formatMoney(ledgerSummary.expenses)}</div>
+            </div>
+            <div className="rounded-xl border border-amber-900/30 bg-black/20 p-3">
+              <div className="text-[10px] text-stone-500">Defter farkı</div>
+              <div className={"mt-1 text-lg font-bold " + (ledgerSummary.income - ledgerSummary.expenses >= 0 ? "text-amber-200" : "text-red-300")}>{formatMoney(ledgerSummary.income - ledgerSummary.expenses)}</div>
+              <div className="mt-1 text-[10px] text-stone-600">{ledgerSummary.count} kayıt</div>
+            </div>
+          </div>
+          <div className="mt-4">
+            <div className="mb-2 text-[10px] tracking-widest text-stone-500 font-bold">SON HAREKETLER</div>
+            {ledgerSummary.recent.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-stone-800 p-3 text-xs text-stone-600">Henüz defter hareketi yok. İşlem yaptıkça kayıtlar burada görünecek.</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {ledgerSummary.recent.map((row, index) => (
+                  <li key={index} className="flex items-center justify-between gap-3 rounded-lg bg-black/20 px-3 py-2 text-xs">
+                    <span className="min-w-0 truncate text-stone-300">{row.label}</span>
+                    <span className={"shrink-0 font-mono font-semibold " + (row.amount < 0 ? "text-red-300" : "text-emerald-300")}>{row.amount > 0 ? "+" : ""}{formatMoney(row.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <p className="mt-3 text-[10px] leading-relaxed text-stone-600">Bu özet yalnızca deftere yazılmış hareketleri toplar; deftere işlenmeyen işlemler ve borç bakiyeleri ayrıca değerlendirilmelidir.</p>
+        </section>
 
         <div className="grid lg:grid-cols-5 gap-4 mb-5">
           <section className="lg:col-span-3 rounded-2xl border border-amber-900/30 bg-[#161210]/90 p-5">
