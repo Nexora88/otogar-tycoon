@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useGameStore } from "@/store/gameStore";
 import { useCareerStore } from "@/store/careerStore";
 import { formatMoney } from "@/lib/utils";
@@ -49,6 +49,7 @@ export default function GameLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const balance = useGameStore((s) => s.balance);
   const reputation = useGameStore((s) => s.reputation);
@@ -216,25 +217,58 @@ export default function GameLayout({
             </div>
           </div>
 
-          {/* Mobil yatay menü */}
-          <nav className="md:hidden flex gap-1 overflow-x-auto px-2 pb-2 text-[11px]">
-            {NAV.map((item) => {
-              if (item.needBoss && !isBoss && careerStarted) return null;
-              const active = pathname?.startsWith(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`shrink-0 px-2.5 py-1 rounded-lg ${
-                    active
-                      ? "bg-amber-950/50 text-amber-100 border border-amber-800/40"
-                      : "text-zinc-500 border border-transparent"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
+          {/* Mobil hızlı menü: ana ekranlar + açılır tam navigasyon */}
+          <nav className="md:hidden px-2 pb-2">
+            <div className="flex items-center gap-1 overflow-x-auto text-[11px]">
+              {NAV.filter((item) => ["/dashboard", "/shift", "/story", "/market", "/terminal"].includes(item.href)).map((item) => {
+                if (item.needBoss && !isBoss && careerStarted) return null;
+                const active = pathname?.startsWith(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`shrink-0 min-h-9 inline-flex items-center px-3 rounded-lg border ${
+                      active
+                        ? "bg-amber-950/50 text-amber-100 border-amber-800/50"
+                        : "text-zinc-400 border-transparent active:bg-zinc-900"
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+              <button
+                type="button"
+                aria-expanded={mobileMenuOpen}
+                aria-controls="mobile-game-menu"
+                onClick={() => setMobileMenuOpen((open) => !open)}
+                className="shrink-0 min-h-9 px-3 rounded-lg border border-zinc-700 text-amber-200 bg-zinc-900"
+              >
+                {mobileMenuOpen ? "Kapat −" : "Tüm menü +"}
+              </button>
+            </div>
+            {mobileMenuOpen && (
+              <div id="mobile-game-menu" className="mt-2 grid grid-cols-2 gap-1 rounded-xl border border-zinc-800 bg-zinc-950 p-2">
+                {NAV.filter((item) => !["/dashboard", "/shift", "/story", "/market", "/terminal"].includes(item.href)).map((item) => {
+                  if (item.needBoss && !isBoss && careerStarted) return null;
+                  const active = pathname?.startsWith(item.href);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`min-h-10 flex items-center rounded-lg px-3 text-xs border ${
+                        active
+                          ? "bg-amber-950/50 text-amber-100 border-amber-800/50"
+                          : "text-zinc-400 border-transparent active:bg-zinc-900"
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </nav>
         </header>
 
