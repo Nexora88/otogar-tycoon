@@ -6,7 +6,6 @@ import { SplashScreen } from "@/components/SplashScreen";
 
 export default function LandingPage() {
   const [showSplash, setShowSplash] = useState(true);
-  const [live, setLive] = useState({ rooms: 5, trips: 72, online: 18 });
 
   useEffect(() => {
     try {
@@ -17,18 +16,6 @@ export default function LandingPage() {
       /* ignore */
     }
   }, []);
-
-  useEffect(() => {
-    if (showSplash) return;
-    const t = setInterval(() => {
-      setLive({
-        rooms: 3 + Math.floor(Math.random() * 10),
-        trips: 40 + Math.floor(Math.random() * 120),
-        online: 12 + Math.floor(Math.random() * 40),
-      });
-    }, 6000);
-    return () => clearInterval(t);
-  }, [showSplash]);
 
   const onSplashDone = useCallback(() => setShowSplash(false), []);
 
@@ -146,10 +133,10 @@ export default function LandingPage() {
               </Link>
             </div>
 
-            <div className="mt-10 flex flex-wrap gap-8">
-              <Stat label="Açık oda" value={`~${live.rooms}`} />
-              <Stat label="Sefer nabzı" value={`~${live.trips}`} />
-              <Stat label="Peron" value={`~${live.online}`} />
+            <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Stat label="Şirket yönetimi" value="Kendi şirketin" />
+              <Stat label="Ulaşım ağı" value="Hat ve seferler" />
+              <Stat label="Rekabet" value="Rakiplerle yarış" />
             </div>
           </div>
 
