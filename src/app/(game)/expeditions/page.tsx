@@ -185,8 +185,8 @@ export default function ExpeditionsPage() {
             );
             const mu = b?.muavinCost || 400;
             const restBonus = exp.soldTickets * st.restStopDealLevel * 4;
-            let revenue = exp.soldTickets * exp.ticketPrice + restBonus;
-            if (exp.smuggle) revenue += exp.smugglePaid || 10000;
+            // Riskli bagaj ödemesi sefer açılırken kasaya yazılır; burada ikinci kez sayma.
+            const revenue = exp.soldTickets * exp.ticketPrice + restBonus;
             const cost = fuel + cat + mu;
             const profit = revenue - cost;
             const driver = st.drivers.find((d) => d.id === exp.driverId);
