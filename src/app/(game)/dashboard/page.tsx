@@ -27,6 +27,47 @@ export default function DashboardPage() {
   const calendarTitle = useGameStore((s) => s.calendarTitle);
   const calendarMood = useGameStore((s) => s.calendarMood);
   const ledger = useGameStore((s) => s.ledger);
+  const terminalBuilt = useGameStore((s) => s.terminalBuilt);
+  const completedTrips = expeditions.filter((e) => e.status === "completed").length;
+  const captainGoals = [
+    {
+      id: "first-trip",
+      title: "İlk seferini tamamla",
+      detail: "Bir hat seç, yolcuları taşı ve seferi tamamla.",
+      progress: Math.min(1, completedTrips),
+      target: 1,
+      href: "/expeditions",
+      action: "Sefer planla",
+    },
+    {
+      id: "terminal",
+      title: "Kendi terminalini kur",
+      detail: "Yazıhaneni büyütüp otogar ekonomisine adım at.",
+      progress: terminalBuilt ? 1 : 0,
+      target: 1,
+      href: "/terminal",
+      action: "Terminale git",
+    },
+    {
+      id: "reputation",
+      title: "Şehirde adını duyur",
+      detail: "Hizmet kalitesiyle itibarını 50 seviyesine taşı.",
+      progress: Math.min(50, Math.max(0, reputation)),
+      target: 50,
+      href: "/staff",
+      action: "Kadroyu yönet",
+    },
+    {
+      id: "fleet",
+      title: "Filo kur",
+      detail: "Üç otobüsle daha fazla hattı yönetebilecek kapasiteye ulaş.",
+      progress: Math.min(3, buses.length),
+      target: 3,
+      href: "/garage",
+      action: "Garaja git",
+    },
+  ];
+
 
   const active = useMemo(
     () =>
@@ -184,6 +225,37 @@ export default function DashboardPage() {
           </div>
           <span className="text-orange-400 text-xl">→</span>
         </Link>
+
+        {/* Kalıcı hedef panosu: ilerleme oyuncunun gerçek oyun durumundan hesaplanır */}
+        <section className="mb-5 rounded-2xl border border-amber-900/40 bg-gradient-to-br from-[#19130e] via-[#11100e] to-[#101418] p-4 sm:p-5">
+          <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
+            <div>
+              <div className="text-[10px] tracking-[0.2em] text-amber-500 font-bold">KAPTANLIK ROTASI</div>
+              <h2 className="mt-1 text-lg font-black text-amber-50">Büyük hedefler, adım adım</h2>
+              <p className="mt-1 text-xs text-stone-500">Hedefler oyun durumuna göre güncellenir. Günlük seri veya kaçırınca ceza yok; kendi temponda ilerle.</p>
+            </div>
+            <span className="text-xs text-amber-200/80">{captainGoals.filter((g) => g.progress >= g.target).length} / {captainGoals.length} tamamlandı</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {captainGoals.map((goal) => {
+              const done = goal.progress >= goal.target;
+              const percent = Math.min(100, Math.round((goal.progress / goal.target) * 100));
+              return (
+                <div key={goal.id} className={`rounded-xl border p-3 ${done ? "border-emerald-900/60 bg-emerald-950/15" : "border-zinc-800 bg-black/20"}`}>
+                  <div className="flex items-start gap-2 justify-between">
+                    <div className="min-w-0">
+                      <div className={`text-sm font-bold ${done ? "text-emerald-300" : "text-stone-100"}`}>{goal.title}</div>
+                      <p className="text-xs text-stone-500 mt-1 leading-5">{goal.detail}</p>
+                    </div>
+                    <span className={`shrink-0 text-[10px] font-bold ${done ? "text-emerald-400" : "text-amber-400"}`}>{done ? "TAMAM" : `${goal.progress} / ${goal.target}`}</span>
+                  </div>
+                  <div className="h-1.5 mt-3 rounded-full bg-zinc-900 overflow-hidden"><div className={`h-full rounded-full transition-all ${done ? "bg-emerald-500" : "bg-amber-500"}`} style={{ width: percent + "%" }} /></div>
+                  <Link href={goal.href} className="inline-flex mt-3 min-h-9 items-center rounded-lg border border-zinc-700 px-3 py-2 text-xs text-stone-300 hover:border-amber-700 hover:text-amber-200">{done ? "Tekrar yönet" : goal.action} →</Link>
+                </div>
+              );
+            })}
+          </div>
+        </section>
 
         {/* Faz 3: kasa hareketleri — mevcut kayıt defterinden türetilir */}
         <section className="mb-5 rounded-2xl border border-emerald-900/35 bg-gradient-to-br from-[#101914] via-[#121510] to-[#17110d] p-4 sm:p-5">
