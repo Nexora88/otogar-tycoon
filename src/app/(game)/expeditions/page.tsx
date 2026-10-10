@@ -33,8 +33,13 @@ export default function ExpeditionsPage() {
     updateExpedition,
     settleExpeditionProfit,
     lastEvent,
+    lastTicket,
     clearLastEvent,
     setHasPlayedOnce,
+    demandMultiplier,
+    officeUpgradeLevel,
+    serviceUpgradeLevel,
+    restStopDealLevel,
     addFatigue,
     setLastTicket,
     pushPhone,
@@ -59,6 +64,10 @@ export default function ExpeditionsPage() {
 
   const route = ROUTES.find((r) => r.id === routeId) || ROUTES[0];
   const bus = buses.find((b) => b.id === busId);
+  const selectedDriver = drivers.find((d) => d.id === driverId);
+  const conditionMultiplier = 0.75 + (bus?.engineHealth ?? 75) / 400;
+  const skillMultiplier = 0.9 + (selectedDriver?.skill ?? 50) / 500;
+  const fatigueMultiplier = 1 - (selectedDriver?.fatigue ?? 75) / 500;
   const driversFree = drivers.filter(
     (d) => d.role === "driver" && !d.onExpedition && d.fatigue < 88
   );
@@ -74,6 +83,47 @@ export default function ExpeditionsPage() {
         ((route?.distance || 400) / 100) * (bus.fuelUse || 28) * useGameStore.getState().fuelPrice
       )
     : 0;
+
+  // Planlama önizlemesi aynı dolum şansını kullanır; sonuç garantisi değildir.
+  const priceRatio = ticketPrice / Math.max(1, maxP);
+  const boardingChance = Math.min(
+    0.98,
+    Math.max(0.12, 0.82 - priceRatio * 0.7) *
+      crierBonus() *
+      demandMultiplier *
+      (1 + officeUpgradeLevel * 0.025) *
+      conditionMultiplier *
+      skillMultiplier *
+      fatigueMultiplier
+  );
+  const estimatedPassengers = bus
+    ? Math.min(
+        bus.seatCount,
+        Math.max(0, Math.round(19 * boardingChance * (priceRatio < 0.4 ? 3 : 1)))
+      )
+    : 0;
+  const estimatedCateringCost = Math.round(
+    estimatedPassengers *
+      (CATERING_INFO[catering]?.perSeat || 10) *
+      Math.max(0.7, 1 - serviceUpgradeLevel * 0.05)
+  );
+  const estimatedRestStopBonus = estimatedPassengers * restStopDealLevel * 4;
+  const estimatedRevenue = estimatedPassengers * ticketPrice + estimatedRestStopBonus;
+  const estimatedCosts = fuelEst + estimatedCateringCost + (bus?.muavinCost || 0);
+  const estimatedProfit = estimatedRevenue - estimatedCosts;
+  const estimatedWear = route
+    ? Math.min(18, Math.max(2, Math.ceil(route.distance / 180)))
+    : 0;
+  const completedReport = lastTicket as {
+    origin?: string;
+    destination?: string;
+    sold?: number;
+    price?: number;
+    revenue?: number;
+    cost?: number;
+    profit?: number;
+    driverName?: string;
+  } | null;
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -95,8 +145,21 @@ export default function ExpeditionsPage() {
             (r?.distance || 400) * 2.1 * st.priceCapMultiplier()
           );
           const ratio = exp.ticketPrice / maxPrice;
-          const chance =
-            Math.min(0.98, Math.max(0.12, 0.82 - ratio * 0.7) * st.crierBonus() * st.demandMultiplier * (1 + st.officeUpgradeLevel * 0.025));
+          const boardingDriver = st.drivers.find((d) => d.id === exp.driverId);
+          const boardingBus = st.buses.find((b) => b.id === exp.busId);
+          const conditionMultiplier = 0.75 + (boardingBus?.engineHealth ?? 75) / 400;
+          const skillMultiplier = 0.9 + (boardingDriver?.skill ?? 50) / 500;
+          const fatigueMultiplier = 1 - (boardingDriver?.fatigue ?? 75) / 500;
+          const chance = Math.min(
+            0.98,
+            Math.max(0.12, 0.82 - ratio * 0.7) *
+              st.crierBonus() *
+              st.demandMultiplier *
+              (1 + st.officeUpgradeLevel * 0.025) *
+              conditionMultiplier *
+              skillMultiplier *
+              fatigueMultiplier
+          );
           if (Math.random() < chance && exp.soldTickets < exp.maxSeats) {
             const add = ratio < 0.4 ? 2 + Math.floor(Math.random() * 3) : 1;
             const sold = Math.min(exp.soldTickets + add, exp.maxSeats);
@@ -142,8 +205,8 @@ export default function ExpeditionsPage() {
             );
             const mu = b?.muavinCost || 400;
             const restBonus = exp.soldTickets * st.restStopDealLevel * 4;
-            let revenue = exp.soldTickets * exp.ticketPrice + restBonus;
-            if (exp.smuggle) revenue += exp.smugglePaid || 10000;
+            // Riskli bagaj ödemesi sefer açılırken kasaya yazılır; burada ikinci kez sayma.
+            const revenue = exp.soldTickets * exp.ticketPrice + restBonus;
             const cost = fuel + cat + mu;
             const profit = revenue - cost;
             const driver = st.drivers.find((d) => d.id === exp.driverId);
@@ -331,14 +394,14 @@ export default function ExpeditionsPage() {
       </div>
 
       {showForm && (
-        <div className="mb-8 bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4">
+        <div className="mb-8 bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-6 space-y-4">
           <div className="grid sm:grid-cols-2 gap-4">
             <label className="text-sm block">
               <span className="text-zinc-500 text-xs">Hat</span>
               <select
                 value={routeId}
                 onChange={(e) => setRouteId(e.target.value)}
-                className="mt-1 w-full bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2"
+                className="mt-1 w-full min-h-11 bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-2"
               >
                 {ROUTES.map((r) => (
                   <option key={r.id} value={r.id}>
@@ -434,6 +497,57 @@ export default function ExpeditionsPage() {
             </div>
           </div>
 
+          <section className="rounded-xl border border-amber-900/40 bg-gradient-to-br from-amber-950/30 via-zinc-950 to-zinc-950 p-4" aria-live="polite">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <div className="text-[10px] font-black tracking-[.18em] text-amber-400">SEFER PLANI</div>
+                <h2 className="mt-1 text-sm font-bold text-zinc-100">Kalkış öncesi işletme tahmini</h2>
+              </div>
+              <span className="rounded-full border border-zinc-700 px-2.5 py-1 text-[10px] text-zinc-400">
+                Simülasyon · kesin sonuç değil
+              </span>
+            </div>
+            <div className="mt-4 grid grid-cols-2 xl:grid-cols-4 gap-2">
+              <div className="rounded-lg border border-zinc-800 bg-black/25 p-3">
+                <div className="text-[10px] text-zinc-500">Tahmini yolcu</div>
+                <div className="mt-1 text-lg font-black text-zinc-100">{estimatedPassengers}<span className="text-xs font-normal text-zinc-500">/{bus?.seatCount || 0}</span></div>
+                <div className="mt-1 h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+                  <div className="h-full rounded-full bg-cyan-400 transition-all" style={{ width: `${bus ? Math.min(100, (estimatedPassengers / bus.seatCount) * 100) : 0}%` }} />
+                </div>
+              </div>
+              <div className="rounded-lg border border-zinc-800 bg-black/25 p-3">
+                <div className="text-[10px] text-zinc-500">Toplam gelir</div>
+                <div className="mt-1 text-lg font-black text-emerald-300">{formatMoney(estimatedRevenue)}</div>
+                <div className="mt-1 text-[10px] text-zinc-600">Bilet + tesis primi</div>
+              </div>
+              <div className="rounded-lg border border-zinc-800 bg-black/25 p-3">
+                <div className="text-[10px] text-zinc-500">Yakıt + ikram + muavin</div>
+                <div className="mt-1 text-lg font-black text-orange-200">{formatMoney(estimatedCosts)}</div>
+                <div className="mt-1 text-[10px] text-zinc-600">Mazot {formatMoney(fuelEst)}</div>
+              </div>
+              <div className="rounded-lg border border-zinc-800 bg-black/25 p-3">
+                <div className="text-[10px] text-zinc-500">Tahmini sefer sonucu</div>
+                <div className={`mt-1 text-lg font-black ${estimatedProfit >= 0 ? "text-emerald-300" : "text-red-300"}`}>{estimatedProfit > 0 ? "+" : ""}{formatMoney(estimatedProfit)}</div>
+                <div className="mt-1 text-[10px] text-zinc-600">Dinlenme tesisi primi dahil</div>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-500">
+              <span>Hat: {route?.distance || 0} km</span>
+              <span>Fiyat seviyesi: {priceRatio < 0.4 ? "Uygun · hızlı dolum" : priceRatio > 0.68 ? "Yüksek · satış yavaşlayabilir" : "Dengeli"}</span>
+              <span>Motor yıpranması: yaklaşık %{estimatedWear}</span>
+              {selectedDriver && <span>Şoför becerisi: %{selectedDriver.skill} · yorgunluk %{Math.round(selectedDriver.fatigue)}</span>}
+              {bus && bus.engineHealth < 45 && <span className="font-semibold text-red-300">Uyarı: motor sağlığı düşük</span>}
+            </div>
+            <p className="mt-3 text-[10px] leading-relaxed text-zinc-600">
+              Tahmin; yakıt, ikram ve muavin giderlerini kapsar. Şoför maaşı, yol olayları, vergi ve beklenmedik masraflar dahil değildir.
+            </p>
+            {estimatedProfit < 0 && (
+              <p className="mt-3 rounded-lg border border-red-900/50 bg-red-950/20 p-2.5 text-xs text-red-200">
+                Bu plan mevcut varsayımlarla zarar yazabilir. Bilet fiyatını, ikramı veya daha ekonomik bir hattı değerlendirebilirsin.
+              </p>
+            )}
+          </section>
+
           <label className="flex items-start gap-2 text-xs text-zinc-400">
             <input
               type="checkbox"
@@ -464,6 +578,27 @@ export default function ExpeditionsPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {completedReport && (
+        <section className="mb-5 rounded-2xl border border-emerald-900/40 bg-emerald-950/10 p-4 sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="text-[10px] font-black tracking-[.18em] text-emerald-400">SON SEFER FİŞİ</div>
+              <h2 className="mt-1 text-sm font-bold">{completedReport.origin} → {completedReport.destination}</h2>
+              <p className="mt-1 text-xs text-zinc-500">{completedReport.driverName || "Şoför"} · {completedReport.sold ?? 0} yolcu × {formatMoney(completedReport.price ?? 0)}</p>
+            </div>
+            <div className={`text-xl font-black ${(completedReport.profit ?? 0) >= 0 ? "text-emerald-300" : "text-red-300"}`}>
+              {(completedReport.profit ?? 0) > 0 ? "+" : ""}{formatMoney(completedReport.profit ?? 0)}
+            </div>
+          </div>
+          <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <div className="rounded-lg bg-black/25 p-3"><div className="text-[10px] text-zinc-500">Gelir</div><div className="mt-1 font-bold">{formatMoney(completedReport.revenue ?? 0)}</div></div>
+            <div className="rounded-lg bg-black/25 p-3"><div className="text-[10px] text-zinc-500">Gider</div><div className="mt-1 font-bold">{formatMoney(completedReport.cost ?? 0)}</div></div>
+            <div className="rounded-lg bg-black/25 p-3"><div className="text-[10px] text-zinc-500">Sonuç</div><div className="mt-1 font-bold">{(completedReport.profit ?? 0) >= 0 ? "Kârlı sefer" : "Zararlı sefer"}</div></div>
+          </div>
+          <p className="mt-3 text-[10px] text-zinc-600">Bu fiş son tamamlanan seferi gösterir; sonraki sefer tamamlandığında yenilenir.</p>
+        </section>
       )}
 
       <div className="space-y-3">
