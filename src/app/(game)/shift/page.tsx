@@ -2,9 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useCareerStore } from "@/store/careerStore";
-import { RANK_LABEL, MEMLEKET_HITAP, rankNeed } from "@/store/careerStore";
-// rankNeed careerStore'da export; yoksa apprenticeContent'ten
+import { useCareerStore, RANK_LABEL, MEMLEKET_HITAP } from "@/store/careerStore";
 import { useGameStore } from "@/store/gameStore";
 
 export default function ShiftPage() {
@@ -18,24 +16,30 @@ export default function ShiftPage() {
     c.syncShiftFromClock();
   }, [gameHour, c.careerStarted]);
 
+  /* —— Henüz başlamadı —— */
   if (!c.careerStarted) {
     return (
-      <div className="p-4 sm:p-8 max-w-md mx-auto">
-        <h1 className="text-2xl font-bold mb-2">Perona yazıl</h1>
-        <p className="text-sm text-zinc-500 mb-4 leading-relaxed">
-          Çırakken <strong className="text-zinc-300">sefer düzenleyemezsin</strong>.
-          Yardım et, olaylara karış, birik, sonra kendi terminalin.
+      <div className="mx-auto flex min-h-[70vh] max-w-sm flex-col justify-center p-6">
+        <div className="text-[10px] font-bold tracking-[0.3em] text-amber-500">
+          ÇIRAKLIK
+        </div>
+        <h1 className="mt-2 text-2xl font-black text-stone-100">Perona yazıl</h1>
+        <p className="mt-2 text-sm text-zinc-500">
+          Çay, ayak işi, patron. Sefer sonra.
         </p>
-        <label className="text-xs text-zinc-500">Ad</label>
+
+        <label className="mt-6 text-[11px] text-zinc-500">Ad</label>
         <input
-          className="w-full mb-3 px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-700 text-sm"
+          className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Ahmet"
+          placeholder="Örn. Eymen"
+          maxLength={24}
         />
-        <label className="text-xs text-zinc-500">Memleket</label>
+
+        <label className="mt-3 text-[11px] text-zinc-500">Memleket</label>
         <select
-          className="w-full mb-4 px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-700 text-sm"
+          className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm"
           value={mem}
           onChange={(e) => setMem(e.target.value)}
         >
@@ -45,111 +49,95 @@ export default function ShiftPage() {
             </option>
           ))}
         </select>
+
         <button
           type="button"
           onClick={() => c.startCareer(name, mem)}
-          className="w-full py-3 rounded-xl font-bold text-sm text-black bg-amber-500"
+          className="mt-6 w-full rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 py-3.5 text-sm font-black text-stone-950"
         >
           Vardiyaya başla
         </button>
+
+        <p className="mt-4 text-center text-[11px] text-zinc-600">
+          Hikâye açılışından geldiysen zaten kayıtlısın — panelden dene.
+        </p>
       </div>
     );
   }
 
+  /* —— Bağımsız —— */
   if (c.careerDone) {
     return (
-      <div className="p-8 max-w-md mx-auto text-center">
-        <h1 className="text-xl font-bold text-emerald-400">Bağımsız esnaf</h1>
-        <p className="text-sm text-zinc-400 mt-3">
-          Peron seni tanıdı. Birikim: {c.savings} ₺ — kasaya aktarılacak.
+      <div className="mx-auto max-w-sm p-8 text-center">
+        <div className="text-[10px] font-bold tracking-[0.25em] text-emerald-500">
+          BAĞIMSIZ
+        </div>
+        <h1 className="mt-2 text-xl font-black text-emerald-300">
+          Esnaf oldun
+        </h1>
+        <p className="mt-2 text-sm text-zinc-500">
+          Birikim {c.savings.toLocaleString("tr-TR")} ₺
         </p>
         <Link
           href="/setup"
-          className="inline-block mt-6 px-6 py-3 rounded-xl bg-amber-500 text-black font-bold text-sm"
+          className="mt-6 inline-block w-full rounded-xl bg-amber-500 py-3 text-sm font-bold text-black"
         >
-          Kendi terminalini kur
+          Terminal kur
         </Link>
-        <Link href="/dashboard" className="block mt-3 text-xs text-zinc-500">
+        <Link href="/dashboard" className="mt-3 block text-xs text-zinc-500">
           Panel
         </Link>
       </div>
     );
   }
 
+  const fatiguePct = Math.round(c.fatigue);
+
   return (
-    <div className="p-4 sm:p-8 max-w-lg mx-auto pb-24">
-      <div className="mb-4 rounded-2xl border border-amber-900/50 bg-gradient-to-r from-amber-950/30 via-zinc-950 to-cyan-950/20 p-4">
-        <div className="text-[10px] tracking-[0.24em] text-amber-500 font-black">1987 · PERONDA İLK GÜN</div>
-        <h2 className="text-lg font-black mt-1">Burada sadece görev yapmıyorsun. Bir isim inşa ediyorsun.</h2>
-        <p className="text-xs text-zinc-400 mt-2 leading-5">Her vardiya patronla ilişkin, ustaların güveni, kulisler, iş teklifleri ve ani olaylarla şirketinin geleceğini şekillendiriyor. Temiz kalabilir, hızlı yükselebilir veya kendi yolunu açabilirsin.</p>
-        <div className="flex flex-wrap gap-2 mt-3 text-[10px]">
-          <span className="px-2 py-1 rounded-full bg-zinc-900 border border-zinc-800">GÜVEN → rütbe</span>
-          <span className="px-2 py-1 rounded-full bg-zinc-900 border border-zinc-800">TANINIRLIK → fırsat</span>
-          <span className="px-2 py-1 rounded-full bg-zinc-900 border border-zinc-800">SEÇİMLER → hikâye</span>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap justify-between gap-2 mb-4">
-        <div>
-          <h1 className="text-xl font-bold">{c.displayHitap}</h1>
-          <p className="text-xs text-zinc-500">
-            {c.companyName} · {c.workCity} · {RANK_LABEL[c.rank]}
-          </p>
-          <p className="text-xs text-amber-500/90 mt-1">
-            {c.shiftLabelText} · {String(gameHour).padStart(2, "0")}:00 · yorgun %
-            {Math.round(c.fatigue)}
-          </p>
-        </div>
-        <div className="flex flex-col gap-1">
-          <button
-            type="button"
-            onClick={() => c.rollShiftTasks()}
-            className="text-xs px-3 py-1.5 rounded-lg border border-zinc-600"
-          >
-            Vardiya yenile
-          </button>
-          <button
-            type="button"
-            onClick={() => c.rest?.()}
-            className="text-xs px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-400"
-          >
-            Dinlen
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-2 mb-4 text-center text-xs">
-        <div className="bg-zinc-900 rounded-lg p-2 border border-zinc-800">
-          <div className="text-zinc-500">Güven</div>
-          <div className="text-lg font-bold text-cyan-400">{c.trust}</div>
-        </div>
-        <div className="bg-zinc-900 rounded-lg p-2 border border-zinc-800">
-          <div className="text-zinc-500">Tanınırlık</div>
-          <div className="text-lg font-bold text-amber-400">{c.fame}</div>
-        </div>
-        <div className="bg-zinc-900 rounded-lg p-2 border border-zinc-800">
-          <div className="text-zinc-500">Birikim</div>
-          <div className="text-lg font-bold text-emerald-400">{c.savings} ₺</div>
-        </div>
-      </div>
-
-      {/* ANİ OLAY */}
-      {c.drama && (
-        <div className="mb-4 p-4 rounded-2xl border-2 border-red-800 bg-red-950/40">
-          <div className="text-[10px] font-bold text-red-400 tracking-widest">
-            ANİ OLAY · {c.drama.kind.toUpperCase()}
+    <div className="mx-auto max-w-md p-4 pb-28 sm:p-6">
+      {/* Üst şerit — kısa */}
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[10px] font-bold tracking-[0.2em] text-amber-500">
+            VARDİYA · {String(gameHour).padStart(2, "0")}:00
           </div>
-          <div className="font-bold text-sm mt-1">{c.drama.title}</div>
-          <p className="text-sm text-zinc-300 mt-2 leading-relaxed">
-            {c.drama.body}
+          <h1 className="truncate text-lg font-black text-stone-100">
+            {c.displayHitap || c.playerName}
+          </h1>
+          <p className="truncate text-[11px] text-zinc-500">
+            {c.companyName} · {RANK_LABEL[c.rank]}
           </p>
-          <div className="mt-3 flex flex-col gap-2">
+        </div>
+        <button
+          type="button"
+          onClick={() => c.rollShiftTasks()}
+          className="shrink-0 rounded-lg border border-amber-800/50 bg-amber-950/30 px-3 py-2 text-[11px] font-semibold text-amber-200"
+        >
+          Yeni işler
+        </button>
+      </div>
+
+      {/* 3 sayı — metin yok */}
+      <div className="mb-4 grid grid-cols-4 gap-1.5 text-center">
+        <Stat label="Güven" value={String(c.trust)} tone="cyan" />
+        <Stat label="Ün" value={String(c.fame)} tone="amber" />
+        <Stat label="₺" value={String(c.savings)} tone="emerald" />
+        <Stat label="Yorgun" value={`%${fatiguePct}`} tone="zinc" />
+      </div>
+
+      {/* Patron / teklif / drama — kompakt */}
+      {c.drama && (
+        <div className="mb-3 rounded-2xl border border-red-800 bg-red-950/50 p-3">
+          <div className="text-[10px] font-bold text-red-400">ANİ OLAY</div>
+          <div className="mt-1 text-sm font-semibold">{c.drama.title}</div>
+          <p className="mt-1 line-clamp-3 text-xs text-zinc-400">{c.drama.body}</p>
+          <div className="mt-3 flex flex-col gap-1.5">
             {c.drama.choices.map((ch) => (
               <button
                 key={ch.id}
                 type="button"
                 onClick={() => c.resolveDrama(ch.id)}
-                className="text-left px-3 py-2.5 rounded-lg border border-red-900/60 bg-zinc-950 text-sm hover:border-red-500"
+                className="rounded-lg border border-red-900/70 bg-zinc-950 px-3 py-2.5 text-left text-sm hover:border-red-500"
               >
                 {ch.label}
               </button>
@@ -159,45 +147,45 @@ export default function ShiftPage() {
       )}
 
       {c.patronCalling && (
-        <div className="mb-4 p-4 rounded-xl border-2 border-amber-600 bg-amber-950/40">
-          <div className="text-xs font-bold text-amber-400">PATRON ÇAĞIRDI</div>
-          <p className="text-sm mt-1">{c.patronName} yazıhanede.</p>
-          <div className="flex gap-2 mt-3">
-            <button
-              type="button"
-              onClick={() => c.answerPatronCall()}
-              className="flex-1 py-2 rounded-lg bg-amber-500 text-black text-sm font-semibold"
-            >
-              Yanına git
-            </button>
-            <button
-              type="button"
-              onClick={() => c.ignorePatronCall()}
-              className="px-3 py-2 rounded-lg border border-zinc-600 text-xs"
-            >
-              Yok say
-            </button>
+        <div className="mb-3 flex items-center gap-2 rounded-xl border border-amber-600/60 bg-amber-950/40 p-3">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] font-bold text-amber-400">PATRON</div>
+            <div className="truncate text-sm">{c.patronName} çağırıyor</div>
           </div>
+          <button
+            type="button"
+            onClick={() => c.answerPatronCall()}
+            className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-bold text-black"
+          >
+            Git
+          </button>
+          <button
+            type="button"
+            onClick={() => c.ignorePatronCall()}
+            className="rounded-lg border border-zinc-600 px-2 py-2 text-[10px] text-zinc-400"
+          >
+            Yok
+          </button>
         </div>
       )}
 
       {c.jobOffer && (
-        <div className="mb-4 p-4 rounded-xl border border-cyan-800 bg-zinc-900">
-          <div className="text-xs text-cyan-400 font-bold">İŞ TEKLİFİ</div>
-          <div className="font-semibold mt-1">{c.jobOffer.company}</div>
-          <p className="text-sm text-zinc-400 mt-1">{c.jobOffer.body}</p>
-          <div className="flex gap-2 mt-3">
+        <div className="mb-3 rounded-xl border border-cyan-800/60 bg-zinc-900 p-3">
+          <div className="text-[10px] font-bold text-cyan-400">İŞ TEKLİFİ</div>
+          <div className="text-sm font-semibold">{c.jobOffer.company}</div>
+          <p className="mt-1 line-clamp-2 text-xs text-zinc-500">{c.jobOffer.body}</p>
+          <div className="mt-2 flex gap-2">
             <button
               type="button"
               onClick={() => c.acceptJobOffer()}
-              className="flex-1 py-2 rounded-lg bg-cyan-600 text-sm font-semibold"
+              className="flex-1 rounded-lg bg-cyan-600 py-2 text-xs font-bold"
             >
               Kabul
             </button>
             <button
               type="button"
               onClick={() => c.refuseJobOffer()}
-              className="px-3 py-2 text-xs border border-zinc-600 rounded-lg"
+              className="rounded-lg border border-zinc-600 px-3 py-2 text-xs"
             >
               Red
             </button>
@@ -206,36 +194,42 @@ export default function ShiftPage() {
       )}
 
       {c.mafiaWhisper && (
-        <div className="mb-4 p-3 rounded-lg bg-red-950/50 border border-red-900 text-xs text-red-200">
+        <button
+          type="button"
+          onClick={() => c.clearOutcome()}
+          className="mb-3 w-full rounded-lg border border-red-900/50 bg-red-950/40 px-3 py-2 text-left text-[11px] text-red-200/90"
+        >
           📰 {c.mafiaWhisper}
-          <button type="button" className="block mt-1 text-zinc-500" onClick={() => c.clearOutcome()}>
-            kapat
-          </button>
-        </div>
+        </button>
       )}
 
       {c.lastOutcome && !c.drama && (
-        <div className="mb-4 p-4 rounded-xl bg-zinc-900 border border-zinc-700 text-sm">
+        <button
+          type="button"
+          onClick={() => c.clearOutcome()}
+          className="mb-3 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-left text-sm text-zinc-300"
+        >
           {c.lastOutcome}
-          <button type="button" onClick={() => c.clearOutcome()} className="block mt-2 text-xs text-zinc-500">
-            Tamam
-          </button>
-        </div>
+          <span className="mt-1 block text-[10px] text-zinc-600">dokun · kapat</span>
+        </button>
       )}
 
+      {/* Aktif görev — tek diyalog */}
       {!c.drama && c.activeTask ? (
-        <div className="bg-zinc-900 border border-amber-900/40 rounded-2xl p-5 mb-4">
-          <div className="text-[10px] tracking-widest text-amber-500 font-bold">
-            {c.activeTask.from.toUpperCase()} · {c.activeTask.speakerName}
+        <div className="mb-4 rounded-2xl border border-amber-800/50 bg-zinc-900 p-4">
+          <div className="text-[10px] font-bold tracking-wider text-amber-500">
+            {c.activeTask.speakerName}
           </div>
-          <p className="text-sm mt-2 leading-relaxed">“{c.activeTask.prompt}”</p>
-          <div className="mt-4 flex flex-col gap-2">
+          <p className="mt-2 text-sm leading-snug text-stone-200">
+            “{shorten(c.activeTask.prompt, 140)}”
+          </p>
+          <div className="mt-3 flex flex-col gap-1.5">
             {c.activeTask.options.map((o) => (
               <button
                 key={o.id}
                 type="button"
                 onClick={() => c.resolveOption(o)}
-                className="w-full text-left px-3 py-2.5 rounded-lg border border-zinc-700 text-sm hover:border-amber-600"
+                className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-3 text-left text-sm font-medium hover:border-amber-600"
               >
                 {o.label}
               </button>
@@ -243,44 +237,112 @@ export default function ShiftPage() {
           </div>
         </div>
       ) : !c.drama ? (
-        <div className="space-y-2 mb-6">
-          <h2 className="text-xs font-bold text-zinc-500 tracking-widest">GÖREVLER</h2>
+        <div className="mb-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-[10px] font-bold tracking-[0.2em] text-zinc-500">
+              İŞLER
+            </h2>
+            <button
+              type="button"
+              onClick={() => c.rest?.()}
+              className="text-[10px] text-zinc-500 hover:text-zinc-300"
+            >
+              Dinlen
+            </button>
+          </div>
           {c.tasks.length === 0 && (
-            <p className="text-xs text-zinc-600">Liste boş — vardiyayı yenile.</p>
+            <button
+              type="button"
+              onClick={() => c.rollShiftTasks()}
+              className="w-full rounded-xl border border-dashed border-zinc-700 py-8 text-sm text-zinc-500"
+            >
+              İş yok · Yeni işler
+            </button>
           )}
           {c.tasks.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => c.openTask(t.id)}
-              className="w-full text-left p-3 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-600"
+              className="flex w-full items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-950/80 p-3 text-left hover:border-amber-800/50"
             >
-              <div className="text-[10px] text-zinc-500">
-                {t.speakerName} · {t.kind}
-              </div>
-              <div className="text-sm mt-0.5 line-clamp-2">{t.prompt}</div>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-950/40 text-xs font-bold text-amber-400">
+                {(t.kind || "iş").slice(0, 2).toUpperCase()}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[10px] text-zinc-500">
+                  {t.speakerName}
+                </span>
+                <span className="block truncate text-sm text-zinc-200">
+                  {shorten(t.prompt, 72)}
+                </span>
+              </span>
+              <span className="text-amber-600">→</span>
             </button>
           ))}
         </div>
       ) : null}
 
-      <div className="flex flex-wrap gap-2 text-xs">
+      <div className="flex flex-wrap gap-2">
         <button
           type="button"
           onClick={() => {
-            if (confirm("İstifa? (yeterli birikim/rütbe gerekir)")) c.resign();
+            if (confirm("İstifa edip kendi işine bakmak istiyor musun?"))
+              c.resign();
           }}
-          className="px-3 py-2 border border-red-900 text-red-400 rounded-lg"
+          className="rounded-lg border border-red-900/60 px-3 py-2 text-[11px] text-red-400"
         >
-          İstifa / kendi işim
+          İstifa
         </button>
+        <Link
+          href="/story"
+          className="rounded-lg border border-zinc-800 px-3 py-2 text-[11px] text-zinc-500"
+        >
+          Hikâye
+        </Link>
       </div>
 
-      <ul className="mt-6 text-[11px] text-zinc-500 space-y-1 max-h-32 overflow-y-auto">
-        {c.log.map((l, i) => (
-          <li key={i}>{l}</li>
-        ))}
-      </ul>
+      {c.log.length > 0 && (
+        <details className="mt-6 text-[11px] text-zinc-600">
+          <summary className="cursor-pointer text-zinc-500">Log</summary>
+          <ul className="mt-2 max-h-28 space-y-1 overflow-y-auto">
+            {c.log.slice(0, 12).map((l, i) => (
+              <li key={i}>{l}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function shorten(s: string, n: number) {
+  const t = (s || "").trim();
+  if (t.length <= n) return t;
+  return t.slice(0, n - 1) + "…";
+}
+
+function Stat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "cyan" | "amber" | "emerald" | "zinc";
+}) {
+  const map = {
+    cyan: "text-cyan-400 border-cyan-900/40",
+    amber: "text-amber-400 border-amber-900/40",
+    emerald: "text-emerald-400 border-emerald-900/40",
+    zinc: "text-zinc-300 border-zinc-800",
+  };
+  return (
+    <div className={`rounded-lg border bg-zinc-950/80 py-2 ${map[tone]}`}>
+      <div className="text-[9px] uppercase tracking-wide text-zinc-600">
+        {label}
+      </div>
+      <div className="mt-0.5 text-sm font-bold tabular-nums">{value}</div>
     </div>
   );
 }
