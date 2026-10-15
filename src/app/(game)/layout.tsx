@@ -16,30 +16,40 @@ import EcosystemAds from "@/components/EcosystemAds";
 import LevelCelebration from "@/components/LevelCelebration";
 import InternationalOfferModal from "@/components/InternationalOfferModal";
 
+/** Önce çekirdek döngü, sonra derin sistemler */
 const NAV: {
   href: string;
   label: string;
   needBoss?: boolean;
+  core?: boolean;
 }[] = [
-  { href: "/dashboard", label: "Panel" },
-  { href: "/shift", label: "Vardiya" },
-  { href: "/map", label: "Harita", needBoss: true },
-  { href: "/expeditions", label: "Seferler", needBoss: true },
-  { href: "/garage", label: "Garaj", needBoss: true },
-  { href: "/office", label: "Ofis", needBoss: true },
-  { href: "/terminal", label: "Terminal", needBoss: true },
+  { href: "/dashboard", label: "Panel", core: true },
+  { href: "/expeditions", label: "Seferler", needBoss: true, core: true },
+  { href: "/shift", label: "Vardiya", core: true },
+  { href: "/garage", label: "Garaj", needBoss: true, core: true },
+  { href: "/office", label: "Ofis", needBoss: true, core: true },
+  { href: "/map", label: "Harita", needBoss: true, core: true },
+  { href: "/rivals", label: "Rakipler", needBoss: true, core: true },
+  { href: "/lobby", label: "Lobi", core: true },
   { href: "/market", label: "Pazar", needBoss: true },
   { href: "/staff", label: "Kadro", needBoss: true },
+  { href: "/terminal", label: "Terminal", needBoss: true },
   { href: "/upgrades", label: "Yatırım", needBoss: true },
-  { href: "/rivals", label: "Rakipler", needBoss: true },
+  { href: "/auction", label: "Borsa", needBoss: true },
   { href: "/capital", label: "Sermaye", needBoss: true },
   { href: "/international", label: "Uluslararası", needBoss: true },
   { href: "/story", label: "Hikâye" },
   { href: "/kulis", label: "Kulis" },
   { href: "/events", label: "Etkinlik" },
   { href: "/how-to-play", label: "Nasıl Oynanır" },
-  { href: "/lobby", label: "Lobi" },
-  { href: "/auction", label: "Borsa", needBoss: true },
+];
+
+const MOBILE_QUICK = [
+  "/dashboard",
+  "/expeditions",
+  "/shift",
+  "/rivals",
+  "/lobby",
 ];
 
 export default function GameLayout({
@@ -93,35 +103,41 @@ export default function GameLayout({
 
   return (
     <div
-      className={`min-h-screen text-zinc-100 flex ${
-        mourning ? "bg-black" : "bg-zinc-950"
+      className={`flex min-h-screen text-zinc-100 ${
+        mourning ? "bg-black" : "bg-[#0c0a08]"
       }`}
     >
-      {/* Sol menü — masaüstü */}
-      <aside className="hidden md:flex w-52 shrink-0 flex-col border-r border-zinc-800 bg-zinc-950/95">
-        <div className="p-4 border-b border-zinc-800">
-          <div className="text-[10px] tracking-[0.2em] text-amber-600 font-bold">
+      <aside className="hidden w-52 shrink-0 flex-col border-r border-amber-950/40 bg-zinc-950/95 md:flex">
+        <div className="border-b border-zinc-800 p-4">
+          <div className="text-[10px] font-bold tracking-[0.2em] text-amber-600">
             OTOGAR TYCOON
           </div>
-          <div className="text-sm font-semibold mt-1 truncate">
+          <div className="mt-1 truncate text-sm font-semibold">
             {companyName || "Yazıhane"}
           </div>
-          <div className="text-[10px] text-zinc-500 mt-0.5">
+          <div className="mt-0.5 text-[10px] text-zinc-500">
             {gameYear || 1987} · Gün {gameDay} ·{" "}
             {String(gameHour).padStart(2, "0")}:00
           </div>
           <div className="mt-3 rounded-lg border border-amber-900/40 bg-amber-950/20 p-2">
             <div className="flex items-center justify-between text-[9px]">
-              <span className="text-amber-400 font-black">LVL {level}</span>
+              <span className="font-black text-amber-400">LVL {level}</span>
               <span className="text-zinc-500">{levelTitle}</span>
             </div>
-            <div className="h-1 bg-zinc-900 rounded-full mt-1 overflow-hidden">
-              <div className="h-full bg-amber-500" style={{ width: Math.min(100, (xp / xpNeed) * 100) + "%" }} />
+            <div className="mt-1 h-1 overflow-hidden rounded-full bg-zinc-900">
+              <div
+                className="h-full bg-amber-500"
+                style={{
+                  width: Math.min(100, (xp / xpNeed) * 100) + "%",
+                }}
+              />
             </div>
-            <div className="text-[8px] text-zinc-600 mt-1">{xp} / {xpNeed} XP</div>
+            <div className="mt-1 text-[8px] text-zinc-600">
+              {xp} / {xpNeed} XP
+            </div>
           </div>
         </div>
-        <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">
+        <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
           {NAV.map((item) => {
             if (item.needBoss && !isBoss && careerStarted) return null;
             const active = pathname?.startsWith(item.href);
@@ -129,10 +145,12 @@ export default function GameLayout({
               <Link
                 key={item.href}
                 href={item.href}
-                className={`block px-3 py-2 rounded-lg text-sm ${
+                className={`block rounded-lg px-3 py-2 text-sm ${
                   active
-                    ? "bg-amber-950/50 text-amber-100 border border-amber-800/50"
-                    : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 border border-transparent"
+                    ? "border border-amber-800/50 bg-amber-950/50 text-amber-100"
+                    : item.core
+                      ? "border border-transparent text-zinc-300 hover:bg-zinc-900 hover:text-zinc-100"
+                      : "border border-transparent text-zinc-600 hover:bg-zinc-900 hover:text-zinc-300"
                 }`}
               >
                 {item.label}
@@ -140,35 +158,34 @@ export default function GameLayout({
             );
           })}
         </nav>
-        <div className="p-3 border-t border-zinc-800 text-[10px] text-zinc-600 space-y-1">
-          <div className="font-mono text-emerald-400/90 text-xs">
+        <div className="space-y-1 border-t border-zinc-800 p-3 text-[10px] text-zinc-600">
+          <div className="font-mono text-xs text-emerald-400/90">
             {formatMoney(balance)}
           </div>
-          <div>İtibar {reputation} · Mazot {fuelPrice} ₺</div>
+          <div>
+            İtibar {reputation} · Mazot {fuelPrice} ₺
+          </div>
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* İnce üst bar */}
+      <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-md">
-          <div className="px-3 sm:px-4 py-2 flex flex-wrap items-center gap-2 justify-between">
-            <div className="md:hidden min-w-0">
-              <div className="text-[10px] text-amber-600 font-bold tracking-wider">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 sm:px-4">
+            <div className="min-w-0 md:hidden">
+              <div className="text-[10px] font-bold tracking-wider text-amber-600">
                 OTOGAR · {gameYear || 1987}
               </div>
-              <div className="text-sm font-semibold truncate">
-                {companyName}
-              </div>
+              <div className="truncate text-sm font-semibold">{companyName}</div>
             </div>
-            <div className="hidden md:block text-xs text-zinc-500">
+            <div className="hidden text-xs text-zinc-500 md:block">
               {calendarTitle || "Peron açık"}
               {national ? " · Coşku" : ""}
               {mourning ? " · Saygı" : ""}
             </div>
 
-            <div className="flex items-center gap-2 text-xs flex-wrap justify-end">
+            <div className="flex flex-wrap items-center justify-end gap-2 text-xs">
               <div className="text-right">
-                <div className="font-mono text-emerald-400 text-sm">
+                <div className="font-mono text-sm text-emerald-400">
                   {formatMoney(balance)}
                 </div>
                 <div className="text-zinc-500 md:hidden">itibar {reputation}</div>
@@ -177,23 +194,23 @@ export default function GameLayout({
                 <button
                   type="button"
                   onClick={() => router.push("/office")}
-                  className="text-[10px] px-2 py-1 rounded border border-red-900/50 text-red-300"
+                  className="rounded border border-red-900/50 px-2 py-1 text-[10px] text-red-300"
                 >
                   Borç {formatMoney(bankDebt || taxDue)}
                 </button>
               )}
               {mafiaDebtDue && (
-                <span className="text-[10px] px-2 py-1 rounded bg-red-950 text-red-300 border border-red-800">
+                <span className="rounded border border-red-800 bg-red-950 px-2 py-1 text-[10px] text-red-300">
                   Kapı
                 </span>
               )}
               {crimeRecord > 0 && (
-                <span className="text-[10px] px-2 py-1 rounded bg-red-950/60 text-red-300 border border-red-900">
+                <span className="rounded border border-red-900 bg-red-950/60 px-2 py-1 text-[10px] text-red-300">
                   Sicil {crimeRecord}
                 </span>
               )}
               {inspector && (
-                <span className="text-[10px] px-2 py-1 rounded bg-amber-950 text-amber-200 border border-amber-800">
+                <span className="rounded border border-amber-800 bg-amber-950 px-2 py-1 text-[10px] text-amber-200">
                   Müfettiş
                 </span>
               )}
@@ -201,7 +218,7 @@ export default function GameLayout({
                 <button
                   type="button"
                   onClick={() => openPaperEdition(paperNotify)}
-                  className="text-[10px] px-2 py-1 rounded border border-zinc-700 text-zinc-300"
+                  className="rounded border border-zinc-700 px-2 py-1 text-[10px] text-zinc-300"
                 >
                   Gazete
                 </button>
@@ -209,7 +226,7 @@ export default function GameLayout({
               {forceRegister && isGuest && (
                 <Link
                   href="/register"
-                  className="text-[10px] px-2 py-1 rounded border border-cyan-800 text-cyan-300"
+                  className="rounded border border-cyan-800 px-2 py-1 text-[10px] text-cyan-300"
                 >
                   Hesap
                 </Link>
@@ -217,56 +234,62 @@ export default function GameLayout({
             </div>
           </div>
 
-          {/* Mobil hızlı menü: ana ekranlar + açılır tam navigasyon */}
-          <nav className="md:hidden px-2 pb-2">
+          <nav className="px-2 pb-2 md:hidden">
             <div className="flex items-center gap-1 overflow-x-auto text-[11px]">
-              {NAV.filter((item) => ["/dashboard", "/shift", "/story", "/market", "/terminal"].includes(item.href)).map((item) => {
-                if (item.needBoss && !isBoss && careerStarted) return null;
-                const active = pathname?.startsWith(item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`shrink-0 min-h-9 inline-flex items-center px-3 rounded-lg border ${
-                      active
-                        ? "bg-amber-950/50 text-amber-100 border-amber-800/50"
-                        : "text-zinc-400 border-transparent active:bg-zinc-900"
-                    }`}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
-              <button
-                type="button"
-                aria-expanded={mobileMenuOpen}
-                aria-controls="mobile-game-menu"
-                onClick={() => setMobileMenuOpen((open) => !open)}
-                className="shrink-0 min-h-9 px-3 rounded-lg border border-zinc-700 text-amber-200 bg-zinc-900"
-              >
-                {mobileMenuOpen ? "Kapat −" : "Tüm menü +"}
-              </button>
-            </div>
-            {mobileMenuOpen && (
-              <div id="mobile-game-menu" className="mt-2 grid grid-cols-2 gap-1 rounded-xl border border-zinc-800 bg-zinc-950 p-2">
-                {NAV.filter((item) => !["/dashboard", "/shift", "/story", "/market", "/terminal"].includes(item.href)).map((item) => {
+              {NAV.filter((item) => MOBILE_QUICK.includes(item.href)).map(
+                (item) => {
                   if (item.needBoss && !isBoss && careerStarted) return null;
                   const active = pathname?.startsWith(item.href);
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className={`min-h-10 flex items-center rounded-lg px-3 text-xs border ${
+                      className={`inline-flex min-h-9 shrink-0 items-center rounded-lg border px-3 ${
                         active
-                          ? "bg-amber-950/50 text-amber-100 border-amber-800/50"
-                          : "text-zinc-400 border-transparent active:bg-zinc-900"
+                          ? "border-amber-800/50 bg-amber-950/50 text-amber-100"
+                          : "border-transparent text-zinc-400 active:bg-zinc-900"
                       }`}
                     >
                       {item.label}
                     </Link>
                   );
-                })}
+                }
+              )}
+              <button
+                type="button"
+                aria-expanded={mobileMenuOpen}
+                aria-controls="mobile-game-menu"
+                onClick={() => setMobileMenuOpen((open) => !open)}
+                className="min-h-9 shrink-0 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-amber-200"
+              >
+                {mobileMenuOpen ? "Kapat −" : "Tüm menü +"}
+              </button>
+            </div>
+            {mobileMenuOpen && (
+              <div
+                id="mobile-game-menu"
+                className="mt-2 grid grid-cols-2 gap-1 rounded-xl border border-zinc-800 bg-zinc-950 p-2"
+              >
+                {NAV.filter((item) => !MOBILE_QUICK.includes(item.href)).map(
+                  (item) => {
+                    if (item.needBoss && !isBoss && careerStarted) return null;
+                    const active = pathname?.startsWith(item.href);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`flex min-h-10 items-center rounded-lg border px-3 text-xs ${
+                          active
+                            ? "border-amber-800/50 bg-amber-950/50 text-amber-100"
+                            : "border-transparent text-zinc-400 active:bg-zinc-900"
+                        }`}
+                      >
+                        {item.label}
+                      </Link>
+                    );
+                  }
+                )}
               </div>
             )}
           </nav>
@@ -274,7 +297,7 @@ export default function GameLayout({
 
         {(mourning || national) && (
           <div
-            className={`text-center text-[11px] py-1 font-medium ${
+            className={`py-1 text-center text-[11px] font-medium ${
               mourning
                 ? "bg-zinc-900 text-zinc-400"
                 : "bg-amber-950/40 text-amber-200"
@@ -286,7 +309,7 @@ export default function GameLayout({
           </div>
         )}
 
-        <main className="flex-1 w-full">
+        <main className="w-full flex-1">
           {children}
           <EcosystemAds />
         </main>

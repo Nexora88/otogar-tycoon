@@ -10,57 +10,60 @@ export default function PlayPage() {
   const router = useRouter();
   const forceRegister = useGameStore((s) => s.forceRegister);
   const isGuest = useGameStore((s) => s.isGuest);
-  const [ready, setReady] = useState(false);
+  const [hint, setHint] = useState("Peron hazırlanıyor…");
 
   useEffect(() => {
     const g = useGameStore.getState();
     const c = useCareerStore.getState();
 
-    // Misafir süresi doldu → ekranda kal
     if (g.isGuest && g.forceRegister) {
-      setReady(true);
+      setHint("Misafir süresi doldu");
       return;
     }
 
     if (c.careerStarted && !c.careerDone) {
+      setHint("Vardiyaya gidiliyor…");
       router.replace("/shift");
       return;
     }
 
     if (!c.careerStarted) {
+      setHint("Hikâye açılıyor…");
       router.replace("/opening");
       return;
     }
 
     if (!g.setupDone) {
+      setHint("Terminal kurulumu…");
       router.replace("/setup");
       return;
     }
 
+    setHint("Yazıhaneye giriliyor…");
     router.replace("/dashboard");
   }, [router]);
 
   if (isGuest && forceRegister) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
-        <div className="max-w-sm w-full border border-amber-900/50 rounded-2xl p-6 bg-zinc-900 text-center">
-          <div className="text-[10px] tracking-widest text-amber-500 font-bold">
+      <div className="flex min-h-screen items-center justify-center bg-[#0a0908] px-4">
+        <div className="w-full max-w-sm rounded-2xl border border-amber-900/50 bg-zinc-950 p-6 text-center shadow-xl">
+          <div className="text-[10px] font-bold tracking-[0.3em] text-amber-500">
             MİSAFİR SÜRESİ
           </div>
-          <h1 className="text-lg font-bold mt-2">5 oyun günü doldu</h1>
-          <p className="text-sm text-zinc-400 mt-3 leading-relaxed">
-            Devam için hesap oluştur. Kayıt ücretsiz; gerçek para yok.
+          <h1 className="mt-2 text-lg font-black text-stone-100">
+            5 oyun günü doldu
+          </h1>
+          <p className="mt-3 text-sm leading-relaxed text-stone-400">
+            İlerlemeyi kaybetmemek için hesap oluştur. Kayıt ücretsiz — gerçek para
+            yok.
           </p>
           <Link
             href="/register"
-            className="mt-6 inline-block w-full py-3 rounded-xl bg-amber-500 text-black font-bold text-sm"
+            className="mt-6 inline-block w-full rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 py-3 text-sm font-bold text-stone-950"
           >
             Hesap oluştur
           </Link>
-          <Link
-            href="/login"
-            className="mt-3 inline-block text-xs text-cyan-400"
-          >
+          <Link href="/login" className="mt-3 inline-block text-xs text-cyan-400">
             Zaten hesabım var
           </Link>
         </div>
@@ -69,8 +72,10 @@ export default function PlayPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-zinc-500 text-sm">
-      {ready ? "Yönlendiriliyor…" : "Yükleniyor…"}
+    <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#0a0908] px-4">
+      <div className="h-10 w-10 animate-pulse rounded-xl bg-gradient-to-br from-amber-400 to-orange-600" />
+      <p className="text-sm text-stone-500">{hint}</p>
+      <p className="text-[11px] text-stone-700">Otogar Tycoon · 1987</p>
     </div>
   );
 }
