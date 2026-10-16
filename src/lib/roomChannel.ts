@@ -222,4 +222,4 @@ export async function sendLot(lot: PeronLot) {
   if (!channel) return false;
   await channel.send({ type: "broadcast", event: "lot", payload: lot });
   return true;
-    }
+}
