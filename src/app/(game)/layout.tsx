@@ -16,6 +16,7 @@ import EcosystemAds from "@/components/EcosystemAds";
 import LevelCelebration from "@/components/LevelCelebration";
 import InternationalOfferModal from "@/components/InternationalOfferModal";
 import EconomyBootstrap from "@/components/EconomyBootstrap";
+import NextStepBanner from "@/components/NextStepBanner";
 
 /** Önce çekirdek döngü, sonra derin sistemler */
 const NAV: {
@@ -311,6 +312,11 @@ export default function GameLayout({
         )}
 
         <main className="w-full flex-1">
+          {pathname === "/dashboard" ? (
+            <div className="mx-auto max-w-5xl px-4 pt-4 sm:px-6">
+              <NextStepBanner />
+            </div>
+          ) : null}
           {children}
           <EcosystemAds />
         </main>
