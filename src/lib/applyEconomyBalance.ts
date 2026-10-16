@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * Tur 3 ekonomi yaması — layout içinde EconomyBootstrap ile bir kez çalışır.
  */
