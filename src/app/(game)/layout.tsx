@@ -15,6 +15,7 @@ import InspectorModal from "@/components/InspectorModal";
 import EcosystemAds from "@/components/EcosystemAds";
 import LevelCelebration from "@/components/LevelCelebration";
 import InternationalOfferModal from "@/components/InternationalOfferModal";
+import EconomyBootstrap from "@/components/EconomyBootstrap";
 
 /** Önce çekirdek döngü, sonra derin sistemler */
 const NAV: {
@@ -315,6 +316,7 @@ export default function GameLayout({
         </main>
       </div>
 
+      <EconomyBootstrap />
       <PhoneUI />
       <NewspaperModal />
       <MafiaModal />
